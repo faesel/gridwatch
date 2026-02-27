@@ -98,7 +98,7 @@ function App() {
             ))}
           </div>
           <div className={styles.sidebarBottom}>
-            <div className={styles.sidebarFooter}>v0.5.4 — GRIDWATCH</div>
+            <div className={styles.sidebarFooter}>v{__APP_VERSION__} — GRIDWATCH</div>
             <div
               className={`${styles.navItem} ${activePage === 'settings' ? styles.navItemActive : ''}`}
               onClick={() => setActivePage('settings')}
