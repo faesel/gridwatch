@@ -11,6 +11,8 @@ declare global {
       setTags: (sessionId: string, tags: string[]) => Promise<boolean>;
       setZoomFactor: (factor: number) => void;
       getZoomFactor: () => number;
+      checkForUpdate: () => Promise<{ hasUpdate: boolean; latestVersion?: string; downloadUrl?: string }>;
+      openExternal: (url: string) => Promise<void>;
     };
   }
   const __APP_VERSION__: string;

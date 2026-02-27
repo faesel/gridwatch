@@ -104,3 +104,47 @@
   font-size: 14px;
   letter-spacing: 2px;
 }
+
+.updateBanner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 16px;
+  background: rgba(255, 102, 0, 0.12);
+  border-bottom: 1px solid rgba(255, 102, 0, 0.3);
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #ff6600;
+  flex-shrink: 0;
+}
+
+.updateBtn {
+  background: none;
+  border: 1px solid #ff6600;
+  color: #ff6600;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 2px;
+  padding: 3px 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.updateBtn:hover {
+  background: #ff6600;
+  color: #050510;
+}
+
+.updateDismiss {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: rgba(255, 102, 0, 0.6);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.updateDismiss:hover {
+  color: #ff6600;
+}

@@ -46,6 +46,7 @@ function App() {
   const [activePage, setActivePage] = useState('sessions')
   const [sessions, setSessions] = useState<SessionData[]>([])
   const [loading, setLoading] = useState(true)
+  const [update, setUpdate] = useState<{ latestVersion: string; downloadUrl: string } | null>(null)
   const [appSettings, setAppSettings] = useState<AppSettings>(() => {
     const s = loadSettings()
     applySettings(s)
@@ -63,6 +64,15 @@ function App() {
     load()
     const interval = setInterval(load, 30_000)
     return () => clearInterval(interval)
+  }, [])
+
+  // Check for updates on startup
+  useEffect(() => {
+    window.gridwatchAPI.checkForUpdate().then((result) => {
+      if (result.hasUpdate && result.latestVersion && result.downloadUrl) {
+        setUpdate({ latestVersion: result.latestVersion, downloadUrl: result.downloadUrl })
+      }
+    }).catch(() => {})
   }, [])
 
   const renderPage = () => {
@@ -83,6 +93,19 @@ function App() {
       <div className={styles.titlebar}>
         <img src={logoWordmark} alt="GridWatch" />
       </div>
+      {update && (
+        <div className={styles.updateBanner}>
+          <span>⬆ GridWatch v{update.latestVersion} is available</span>
+          <button
+            className={styles.updateBtn}
+            onClick={() => window.gridwatchAPI.openExternal(update.downloadUrl)}
+          >DOWNLOAD</button>
+          <button
+            className={styles.updateDismiss}
+            onClick={() => setUpdate(null)}
+          >×</button>
+        </div>
+      )}
       <div className={styles.body}>
         <nav className={styles.sidebar}>
           <div className={styles.sidebarTop}>

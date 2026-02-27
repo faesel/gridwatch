@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeImage, shell } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import os from 'node:os'
 import fs from 'node:fs'
+import https from 'node:https'
 import type { SessionData, TokenDataPoint, RewindSnapshot } from '../src/types/session'
 
 // Must be set before app is ready so the OS picks it up for dock/taskbar tooltip
@@ -424,6 +425,56 @@ ipcMain.handle('sessions:set-tags', async (_e, sessionId: string, tags: string[]
   } catch {
     return false
   }
+})
+
+// ── IPC: app:check-for-update ──────────────────────────────────────────────────
+
+function checkForUpdate(): Promise<{ hasUpdate: boolean; latestVersion?: string; downloadUrl?: string }> {
+  return new Promise((resolve) => {
+    const pkgPath = path.join(process.env.APP_ROOT!, 'package.json')
+    let currentVersion = '0.0.0'
+    try {
+      currentVersion = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')).version
+    } catch { /* ignore */ }
+
+    const options = {
+      hostname: 'api.github.com',
+      path: '/repos/faesel/gridwatch/releases/latest',
+      headers: { 'User-Agent': `GridWatch/${currentVersion}` },
+    }
+
+    https.get(options, (res) => {
+      let data = ''
+      res.on('data', (chunk: Buffer) => { data += chunk.toString() })
+      res.on('end', () => {
+        try {
+          const release = JSON.parse(data)
+          const latestTag = (release.tag_name || '').replace(/^v/, '')
+          if (!latestTag) return resolve({ hasUpdate: false })
+
+          const current = currentVersion.split('.').map(Number)
+          const latest = latestTag.split('.').map(Number)
+          const hasUpdate = latest[0] > current[0] ||
+            (latest[0] === current[0] && latest[1] > current[1]) ||
+            (latest[0] === current[0] && latest[1] === current[1] && latest[2] > current[2])
+
+          resolve({
+            hasUpdate,
+            latestVersion: latestTag,
+            downloadUrl: release.html_url || `https://github.com/faesel/gridwatch/releases/tag/v${latestTag}`,
+          })
+        } catch {
+          resolve({ hasUpdate: false })
+        }
+      })
+    }).on('error', () => resolve({ hasUpdate: false }))
+  })
+}
+
+ipcMain.handle('app:check-for-update', async () => checkForUpdate())
+
+ipcMain.handle('app:open-external', async (_e, url: string) => {
+  await shell.openExternal(url)
 })
 
 app.whenReady().then(() => {
