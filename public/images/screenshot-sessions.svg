@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800">
+  <rect width="1280" height="800" fill="#050510"/>
+  <rect x="0" y="0" width="1280" height="800" fill="none" stroke="#1a2a4a" stroke-width="1"/>
+  <text x="640" y="370" font-family="monospace" font-size="18" fill="#4a7a9b" text-anchor="middle">SESSIONS</text>
+  <text x="640" y="400" font-family="monospace" font-size="13" fill="#4a7a9b" text-anchor="middle">[ replace with screenshot ]</text>
+  <rect x="200" y="340" width="880" height="90" rx="4" fill="none" stroke="#1a2a4a" stroke-width="1"/>
+</svg>
