@@ -9,7 +9,19 @@ permissions:
   contents: write
 
 jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create.outputs.upload_url }}
+    steps:
+      - uses: softprops/action-gh-release@v2
+        id: create
+        with:
+          draft: false
+          generate_release_notes: true
+
   release-mac:
+    needs: create-release
     runs-on: macos-latest
 
     steps:
@@ -27,6 +39,7 @@ jobs:
         run: npm run pack:mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload macOS artifacts
         uses: softprops/action-gh-release@v2
@@ -34,6 +47,7 @@ jobs:
           files: release/**/*.dmg
 
   release-win:
+    needs: create-release
     runs-on: windows-latest
 
     steps:
