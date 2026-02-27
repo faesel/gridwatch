@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "vite",
     "dev:debug": "GRIDWATCH_DEVTOOLS=1 vite",
-    "build": "tsc && vite build",
-    "pack:mac": "tsc && vite build && electron-builder --mac",
-    "pack:win": "tsc && vite build && electron-builder --win",
-    "pack:all": "tsc && vite build && electron-builder --mac --win",
+    "clean": "rm -rf dist dist-electron",
+    "build": "npm run clean && tsc && vite build",
+    "pack:mac": "npm run clean && tsc && vite build && electron-builder --mac",
+    "pack:win": "npm run clean && tsc && vite build && electron-builder --win",
+    "pack:all": "npm run clean && tsc && vite build && electron-builder --mac --win",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "postinstall": "node scripts/patch-electron-name.cjs"
