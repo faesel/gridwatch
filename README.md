@@ -149,6 +149,34 @@ The Tron-inspired colour palette is defined as CSS custom properties in `src/ind
 
 ---
 
+## Releasing
+
+Releases are built and published automatically by GitHub Actions when a version tag is pushed.
+
+```bash
+# 1. Bump the version (choose one)
+npm version patch --no-git-tag-version   # 0.5.4 → 0.5.5  (bug fixes)
+npm version minor --no-git-tag-version   # 0.5.4 → 0.6.0  (new features)
+npm version major --no-git-tag-version   # 0.5.4 → 1.0.0  (breaking changes)
+
+# 2. Commit and push
+git add package.json package-lock.json
+git commit -m "chore: bump version to $(node -p "require('./package.json').version")"
+git push origin main
+
+# 3. Tag and push — this triggers the release workflow
+VERSION=$(node -p "require('./package.json').version")
+git tag "v$VERSION" && git push origin "v$VERSION"
+```
+
+The release workflow will:
+1. Create a GitHub Release with auto-generated release notes
+2. Build a signed `.dmg` for macOS (arm64 + x64) in parallel
+3. Build an `.exe` NSIS installer for Windows (x64) in parallel
+4. Upload both artifacts to the release
+
+---
+
 ## Contributing
 
 Contributions are welcome! Please read [CONTRIBUTING.md](.github/CONTRIBUTING.md) before submitting a pull request.
