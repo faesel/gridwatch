@@ -42,8 +42,6 @@
     "oneClick": false,
     "perMachine": false,
     "allowToChangeInstallationDirectory": true,
-    "deleteAppDataOnUninstall": false,
-    "installerIcon": "build/icon.png",
-    "uninstallerIcon": "build/icon.png"
+    "deleteAppDataOnUninstall": false
   }
 }
