@@ -459,6 +459,68 @@ ipcMain.handle('sessions:set-notes', async (_e, sessionId: string, notes: string
   }
 })
 
+// ── IPC: sessions:get-context ─────────────────────────────────────────────────
+
+ipcMain.handle('sessions:get-context', async (_e, sessionId: string): Promise<{
+  plan: string | null
+  checkpoints: string[]
+  notes: string
+  tags: string[]
+}> => {
+  const sessionDir = path.join(os.homedir(), '.copilot', 'session-state', sessionId)
+  const result = { plan: null as string | null, checkpoints: [] as string[], notes: '', tags: [] as string[] }
+  if (!fs.existsSync(sessionDir)) return result
+
+  // Read plan.md
+  const planFile = path.join(sessionDir, 'plan.md')
+  if (fs.existsSync(planFile)) {
+    try { result.plan = fs.readFileSync(planFile, 'utf-8') } catch { /* ignore */ }
+  }
+
+  // Read checkpoint files
+  const cpDir = path.join(sessionDir, 'checkpoints')
+  if (fs.existsSync(cpDir)) {
+    try {
+      const files = fs.readdirSync(cpDir).filter(f => f.endsWith('.md') && f !== 'index.md').sort()
+      for (const f of files) {
+        try { result.checkpoints.push(fs.readFileSync(path.join(cpDir, f), 'utf-8')) } catch { /* ignore */ }
+      }
+    } catch { /* ignore */ }
+  }
+
+  // Read gridwatch.json
+  const metaFile = path.join(sessionDir, 'gridwatch.json')
+  if (fs.existsSync(metaFile)) {
+    try {
+      const d = JSON.parse(fs.readFileSync(metaFile, 'utf-8'))
+      result.tags = Array.isArray(d.tags) ? d.tags : []
+      result.notes = typeof d.notes === 'string' ? d.notes : ''
+    } catch { /* ignore */ }
+  }
+
+  return result
+})
+
+// ── IPC: sessions:write-plan ──────────────────────────────────────────────────
+
+ipcMain.handle('sessions:write-plan', async (_e, sessionId: string, content: string): Promise<boolean> => {
+  try {
+    const sessionDir = path.join(os.homedir(), '.copilot', 'session-state', sessionId)
+    if (!fs.existsSync(sessionDir)) return false
+    const planFile = path.join(sessionDir, 'plan.md')
+    // Append to existing plan if one exists
+    let existing = ''
+    if (fs.existsSync(planFile)) {
+      try { existing = fs.readFileSync(planFile, 'utf-8') } catch { /* ignore */ }
+    }
+    const sep = existing ? '\n\n---\n\n# Transferred Context\n\n' : ''
+    fs.writeFileSync(planFile, existing + sep + content, 'utf-8')
+    return true
+  } catch {
+    return false
+  }
+})
+
 // ── IPC: app:check-for-update ──────────────────────────────────────────────────
 
 function checkForUpdate(): Promise<{ hasUpdate: boolean; latestVersion?: string; downloadUrl?: string }> {

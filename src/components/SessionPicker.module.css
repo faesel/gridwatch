@@ -1,0 +1,101 @@
+.wrap {
+  position: relative;
+  flex: 1;
+}
+
+.input {
+  width: 100%;
+  background: var(--tron-bg);
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text);
+  font-family: inherit;
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
+  padding: 8px 32px 8px 10px;
+  outline: none;
+  letter-spacing: 0.5px;
+}
+
+.input::placeholder {
+  color: var(--tron-text-dim);
+}
+
+.input:focus {
+  border-color: var(--tron-cyan);
+}
+
+.clearBtn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--tron-text-dim);
+  font-size: calc(14 * var(--font-scale, 1) * 1px);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.clearBtn:hover {
+  color: var(--tron-orange);
+}
+
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: var(--tron-panel);
+  border: 1px solid var(--tron-border);
+  border-top: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.option {
+  padding: 8px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(0, 245, 255, 0.05);
+  transition: background 0.1s;
+}
+
+.option:last-child {
+  border-bottom: none;
+}
+
+.optionHighlight {
+  background: rgba(0, 245, 255, 0.08);
+}
+
+.optionSelected {
+  border-left: 2px solid var(--tron-cyan);
+}
+
+.optionLabel {
+  color: var(--tron-text);
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.optionMeta {
+  color: var(--tron-text-dim);
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  margin-top: 2px;
+  letter-spacing: 0.5px;
+}
+
+.noResults {
+  padding: 10px;
+  color: var(--tron-text-dim);
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  text-align: center;
+  letter-spacing: 1px;
+}

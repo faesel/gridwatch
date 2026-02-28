@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { SessionData } from '../types/session'
 import type { InsightResult } from '../types/global'
 import { loadApiKey } from './SettingsPage'
+import SessionPicker from '../components/SessionPicker'
 import styles from './InsightsPage.module.css'
 
 interface Props {
@@ -28,13 +29,16 @@ function scoreLabel(score: number): string {
 }
 
 export default function InsightsPage({ sessions }: Props) {
-  const [selectedId, setSelectedId] = useState('')
+  const [selected, setSelected] = useState<SessionData | null>(null)
   const [result, setResult] = useState<InsightResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const sessionsWithMessages = sessions.filter((s) => s.userMessages.length > 0)
-  const selected = sessionsWithMessages.find((s) => s.id === selectedId) || null
+  const handleSelect = (s: SessionData | null) => {
+    setSelected(s)
+    setResult(null)
+    setError(null)
+  }
 
   const analyse = async () => {
     if (!selected) return
@@ -67,19 +71,13 @@ export default function InsightsPage({ sessions }: Props) {
 
       {/* Session picker */}
       <div className={styles.pickerRow}>
-        <select
-          className={styles.picker}
-          value={selectedId}
-          onChange={(e) => { setSelectedId(e.target.value); setResult(null); setError(null) }}
-        >
-          <option value="">— SELECT A SESSION —</option>
-          {sessionsWithMessages.map((s) => (
-            <option key={s.id} value={s.id}>
-              {truncate(s.summary || s.lastUserMessage || s.id.slice(0, 12), 60)}
-              {' '}({s.userMessages.length} prompts)
-            </option>
-          ))}
-        </select>
+        <SessionPicker
+          sessions={sessions}
+          selected={selected}
+          onSelect={handleSelect}
+          placeholder="Search sessions to analyse…"
+          requireMessages
+        />
         <button
           className={styles.analyseBtn}
           onClick={analyse}
@@ -114,7 +112,7 @@ export default function InsightsPage({ sessions }: Props) {
         <div className={styles.loadingPanel}>
           <div className={styles.spinner} />
           <div className={styles.loadingText}>ANALYSING SESSION PROMPTS…</div>
-          <div className={styles.loadingSubtext}>Sending {selected?.userMessages.length} prompts to OpenAI gpt-4o-mini</div>
+          <div className={styles.loadingSubtext}>Sending {selected?.userMessages.length} prompts to GitHub Models API</div>
         </div>
       )}
 

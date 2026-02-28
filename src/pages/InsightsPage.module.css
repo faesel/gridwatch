@@ -29,29 +29,6 @@
   margin-bottom: 20px;
 }
 
-.picker {
-  flex: 1;
-  background: var(--tron-bg);
-  border: 1px solid var(--tron-border);
-  color: var(--tron-text);
-  font-family: inherit;
-  font-size: calc(12 * var(--font-scale, 1) * 1px);
-  padding: 8px 10px;
-  outline: none;
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-}
-
-.picker:focus {
-  border-color: var(--tron-cyan);
-}
-
-.picker option {
-  background: var(--tron-bg);
-  color: var(--tron-text);
-}
-
 .analyseBtn {
   background: none;
   border: 1px solid var(--tron-cyan);
