@@ -75,6 +75,7 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
   const [transfers, setTransfers] = useState<{ name: string; date: string; size: number }[]>([])
   const [expandedTransfer, setExpandedTransfer] = useState<string | null>(null)
   const [transferContent, setTransferContent] = useState<string | null>(null)
+  const [copiedResume, setCopiedResume] = useState(false)
 
   // Sync localTags, localNotes, and transfers when selected session changes
   useEffect(() => {
@@ -437,7 +438,21 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
           {/* Metadata */}
           <div className={styles.metaGrid}>
             <span className={styles.metaKey}>ID</span>
-            <span className={styles.metaVal}>{selectedSession.id.slice(0, 18)}…</span>
+            <span className={styles.metaVal}>{selectedSession.id}</span>
+
+            <span className={styles.metaKey}>RESUME CMD</span>
+            <span className={styles.metaVal}>
+              <button
+                className={styles.copyBtn}
+                onClick={() => {
+                  navigator.clipboard.writeText(`copilot --resume=${selectedSession.id}`)
+                  setCopiedResume(true)
+                  setTimeout(() => setCopiedResume(false), 1500)
+                }}
+              >
+                {copiedResume ? '✓ Copied' : `copilot --resume=${selectedSession.id}`}
+              </button>
+            </span>
 
             <span className={styles.metaKey}>WORKING DIR</span>
             <span className={styles.metaVal}>{selectedSession.cwd}</span>

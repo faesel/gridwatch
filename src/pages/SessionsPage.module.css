@@ -528,6 +528,24 @@
   word-break: break-all;
 }
 
+.copyBtn {
+  background: transparent;
+  border: 1px solid var(--tron-border);
+  color: var(--tron-cyan);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  padding: 2px 6px;
+  cursor: pointer;
+  word-break: break-all;
+  text-align: left;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.copyBtn:hover {
+  border-color: var(--tron-cyan);
+  box-shadow: var(--tron-glow-cyan);
+}
+
 .section {
   margin-bottom: calc(var(--density-padding) + 6px);
 }
