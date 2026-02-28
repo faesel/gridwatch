@@ -1,30 +1,38 @@
-# GridWatch
-
-> A retro-Tron-themed desktop dashboard for monitoring your GitHub Copilot CLI sessions.
+<div align="center">
+  <img src="build/icon.png" alt="GridWatch Logo" width="180" />
+  <h1>GridWatch</h1>
+  <p><strong>🖥️ A retro-Tron-themed desktop dashboard for monitoring your GitHub Copilot CLI sessions</strong></p>
+  <p>
+    <a href="https://github.com/faesel/gridwatch/releases/latest"><img src="https://img.shields.io/github/v/release/faesel/gridwatch?style=flat-square&color=00f5ff" alt="Latest Release" /></a>
+    <a href="https://github.com/faesel/gridwatch/blob/main/LICENSE"><img src="https://img.shields.io/github/license/faesel/gridwatch?style=flat-square&color=0080ff" alt="License" /></a>
+    <a href="https://github.com/faesel/gridwatch/releases"><img src="https://img.shields.io/github/downloads/faesel/gridwatch/total?style=flat-square&color=ff6600" alt="Downloads" /></a>
+  </p>
+</div>
 
 GridWatch reads the local session data written by [GitHub Copilot CLI](https://githubnext.com/) to `~/.copilot/session-state/` and presents it as a beautiful, real-time dashboard — giving you visibility into your AI-assisted workflow across every project you work on.
 
 ---
 
-## Features
+## ✨ Features
 
-- **Sessions overview** — browse all Copilot CLI sessions with live status, turn counts, token utilisation, and last prompt
-- **Search & tag filtering** — full-text search across sessions plus multi-select tag filtering with checkable tag chips
-- **Pagination** — sessions list paged at 20 per page for fast loading
-- **Prompt history** — read every user message from a session's `events.jsonl` directly in the UI
-- **Token usage graphs** — line and bar charts tracking peak context window usage over time with 1D / 1W / 1M / ALL time range filters
-- **Activity heatmap** — GitHub-style contribution grid showing your session activity over 52 weeks
-- **Tagging** — add, remove, and filter sessions by custom tags
-- **Rename sessions** — give sessions a meaningful name beyond the auto-generated summary
-- **Archive / Delete** — safely archive or permanently remove old sessions (guards against deleting active sessions)
-- **Update notifications** — automatically checks GitHub Releases for new versions and shows a download banner
-- **Settings** — adjustable UI scale, font size, and density presets, persisted between launches
-- **Auto-refresh** — dashboard refreshes every 30 seconds automatically
-- **Retro Tron theme** — neon cyan, electric blue, and orange accents on near-black backgrounds with JetBrains Mono typography
+- 📋 **Sessions overview** — browse all Copilot CLI sessions with live status, turn counts, token utilisation, and last prompt
+- 🔍 **Search & tag filtering** — full-text search across sessions plus multi-select tag filtering with checkable tag chips
+- 📄 **Pagination** — sessions list paged at 20 per page for fast loading
+- 💬 **Prompt history** — read every user message from a session's `events.jsonl` directly in the UI
+- 📈 **Token usage graphs** — line charts tracking peak context window usage over time with 1D / 1W / 1M / ALL time range filters
+- 🟩 **Activity heatmap** — GitHub-style contribution grid showing your session activity over 52 weeks
+- ⚡ **AI Insights** — analyse your sessions with OpenAI to get prompt quality scores and improvement suggestions
+- 🏷️ **Tagging** — add, remove, and filter sessions by custom tags
+- ✏️ **Rename sessions** — give sessions a meaningful name beyond the auto-generated summary
+- 🗑️ **Archive / Delete** — safely archive or permanently remove old sessions (guards against deleting active sessions)
+- 🔔 **Update notifications** — automatically checks GitHub Releases for new versions and shows a download banner
+- ⚙️ **Settings** — adjustable UI scale, font size, and density presets, persisted between launches
+- 🔄 **Auto-refresh** — dashboard refreshes every 30 seconds automatically
+- 🎨 **Retro Tron theme** — neon cyan, electric blue, and orange accents on near-black backgrounds with JetBrains Mono typography
 
 ---
 
-## Screenshots
+## 📸 Screenshots
 
 ### Sessions
 ![Sessions](public/images/screenshot-sessions.svg)
@@ -40,7 +48,7 @@ GridWatch reads the local session data written by [GitHub Copilot CLI](https://g
 
 ---
 
-## Prerequisites
+## 📋 Prerequisites
 
 | Requirement | Version |
 |---|---|
@@ -51,16 +59,16 @@ GridWatch reads the local session data written by [GitHub Copilot CLI](https://g
 
 ---
 
-## Installation
+## 📥 Installation
 
-### Download a release
+### 💾 Download a release
 
 Visit the [Releases](https://github.com/faesel/gridwatch/releases) page and download the installer for your platform:
 
 - **macOS** — `.dmg` (arm64 or x64)
 - **Windows** — `.exe` (NSIS installer)
 
-#### macOS: "app cannot be verified" warning
+#### 🍎 macOS: "app cannot be verified" warning
 
 The app is not code-signed, so macOS Gatekeeper will block it on first launch. After dragging GridWatch to Applications, run:
 
@@ -70,7 +78,7 @@ xattr -cr /Applications/GridWatch.app
 
 Then open GridWatch as normal. You only need to do this once.
 
-### Build from source
+### 🔧 Build from source
 
 ```bash
 # Clone the repository
@@ -86,9 +94,9 @@ npm run dev
 
 ---
 
-## Development
+## 🛠️ Development
 
-### Project structure
+### 📁 Project structure
 
 ```
 gridwatch/
@@ -100,6 +108,7 @@ gridwatch/
 │   │   ├── SessionsPage.tsx    # Sessions list + detail panel
 │   │   ├── TokensPage.tsx      # Token usage charts
 │   │   ├── ActivityPage.tsx    # Heatmap + activity analytics
+│   │   ├── InsightsPage.tsx    # AI-powered prompt feedback
 │   │   └── SettingsPage.tsx    # UI scale / font / density controls
 │   ├── types/
 │   │   ├── session.ts          # SessionData and related interfaces
@@ -112,7 +121,7 @@ gridwatch/
     └── icon.png                # electron-builder icon source
 ```
 
-### Available scripts
+### 📜 Available scripts
 
 ```bash
 npm run dev          # Start development server with hot reload
@@ -125,7 +134,7 @@ npm run pack:win     # Build and package for Windows (creates .exe installer)
 npm run pack:all     # Build for all platforms
 ```
 
-### Data sources
+### 📊 Data sources
 
 GridWatch reads exclusively from local files — no network requests are made except to check for updates.
 
@@ -138,7 +147,7 @@ GridWatch reads exclusively from local files — no network requests are made ex
 | Session tags / custom data | `~/.copilot/session-state/<uuid>/gridwatch.json` (written by GridWatch) |
 | Update check | `api.github.com/repos/faesel/gridwatch/releases/latest` (on startup only) |
 
-### Tech stack
+### ⚙️ Tech stack
 
 | Layer | Technology |
 |---|---|
@@ -151,7 +160,7 @@ GridWatch reads exclusively from local files — no network requests are made ex
 | YAML parsing | js-yaml |
 | Font | JetBrains Mono (@fontsource) |
 
-### Design system
+### 🎨 Design system
 
 The Tron-inspired colour palette is defined as CSS custom properties in `src/index.css`:
 
@@ -166,7 +175,7 @@ The Tron-inspired colour palette is defined as CSS custom properties in `src/ind
 
 ---
 
-## Releasing
+## 🚀 Releasing
 
 Releases are built and published automatically by GitHub Actions when a version tag is pushed.
 
@@ -196,19 +205,19 @@ The release workflow will:
 
 ---
 
-## Contributing
+## 🤝 Contributing
 
 Contributions are welcome! Please read [CONTRIBUTING.md](.github/CONTRIBUTING.md) before submitting a pull request.
 
 ---
 
-## License
+## 📄 License
 
 MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
-## Author
+## 👤 Author
 
 **Faesel Saeed**
 [faesel.com](https://www.faesel.com) · [GitHub](https://github.com/faesel) · [LinkedIn](https://www.linkedin.com/in/faesel-saeed-a97b1614)

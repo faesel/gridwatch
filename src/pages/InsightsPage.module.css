@@ -1,12 +1,12 @@
 .page {
-  padding: 24px;
+  padding: calc(var(--density-padding) + 14px);
   max-width: 800px;
   overflow-y: auto;
   height: 100%;
 }
 
 .pageTitle {
-  font-size: 18px;
+  font-size: calc(18 * var(--font-scale, 1) * 1px);
   font-weight: 700;
   color: var(--tron-cyan);
   text-shadow: var(--tron-glow-cyan);
@@ -15,7 +15,7 @@
 }
 
 .subtitle {
-  font-size: 11px;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
   color: var(--tron-text-dim);
   letter-spacing: 0.5px;
   margin-bottom: 20px;
@@ -35,7 +35,7 @@
   border: 1px solid var(--tron-border);
   color: var(--tron-text);
   font-family: inherit;
-  font-size: 12px;
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
   padding: 8px 10px;
   outline: none;
   cursor: pointer;
@@ -57,7 +57,7 @@
   border: 1px solid var(--tron-cyan);
   color: var(--tron-cyan);
   font-family: inherit;
-  font-size: 11px;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
   font-weight: 700;
   letter-spacing: 1px;
   padding: 8px 18px;
@@ -85,14 +85,14 @@
 }
 
 .previewTitle {
-  font-size: 10px;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
   letter-spacing: 2px;
   color: var(--tron-text-dim);
   margin-bottom: 10px;
 }
 
 .previewPrompt {
-  font-size: 11px;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
   color: var(--tron-text);
   padding: 6px 0;
   border-bottom: 1px solid rgba(26, 42, 74, 0.5);
@@ -105,11 +105,11 @@
 .promptNum {
   color: var(--tron-text-dim);
   margin-right: 8px;
-  font-size: 10px;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
 }
 
 .previewMore {
-  font-size: 10px;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
   color: var(--tron-text-dim);
   padding-top: 8px;
 }
@@ -137,14 +137,14 @@
 }
 
 .loadingText {
-  font-size: 12px;
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
   letter-spacing: 2px;
   color: var(--tron-cyan);
   text-shadow: var(--tron-glow-cyan);
 }
 
 .loadingSubtext {
-  font-size: 10px;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
   color: var(--tron-text-dim);
 }
 
@@ -153,7 +153,7 @@
   background: rgba(255, 34, 68, 0.08);
   border: 1px solid #ff2244;
   color: #ff2244;
-  font-size: 11px;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
   letter-spacing: 0.5px;
   padding: 12px 16px;
   margin-bottom: 20px;
@@ -189,13 +189,13 @@
 }
 
 .scoreNum {
-  font-size: 28px;
+  font-size: calc(28 * var(--font-scale, 1) * 1px);
   font-weight: 700;
   line-height: 1;
 }
 
 .scoreMax {
-  font-size: 11px;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
   color: var(--tron-text-dim);
 }
 
@@ -204,14 +204,14 @@
 }
 
 .scoreGrade {
-  font-size: 14px;
+  font-size: calc(14 * var(--font-scale, 1) * 1px);
   font-weight: 700;
   letter-spacing: 2px;
   margin-bottom: 6px;
 }
 
 .scoreSummary {
-  font-size: 12px;
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
   color: var(--tron-text);
   line-height: 1.5;
 }
@@ -224,7 +224,7 @@
 }
 
 .sectionTitle {
-  font-size: 10px;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
   letter-spacing: 2px;
   color: var(--tron-text-dim);
   margin-bottom: 12px;
@@ -249,7 +249,7 @@
 }
 
 .feedbackPrompt {
-  font-size: 11px;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
   color: var(--tron-text);
   flex: 1;
   white-space: nowrap;
@@ -258,7 +258,7 @@
 }
 
 .feedbackScore {
-  font-size: 10px;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
   font-weight: 700;
   letter-spacing: 1px;
   padding: 2px 8px;
@@ -267,14 +267,14 @@
 }
 
 .feedbackText {
-  font-size: 11px;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
   color: var(--tron-text-dim);
   line-height: 1.5;
 }
 
 /* ── Suggestions ──────────────────────────────── */
 .suggestionItem {
-  font-size: 12px;
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
   color: var(--tron-text);
   padding: 8px 0;
   border-bottom: 1px solid rgba(26, 42, 74, 0.5);

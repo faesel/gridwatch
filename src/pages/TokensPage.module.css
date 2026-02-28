@@ -1,9 +1,9 @@
 .page {
-  padding: 24px;
+  padding: calc(var(--density-padding) + 14px);
 }
 
 .pageTitle {
-  font-size: 18px;
+  font-size: calc(18 * var(--font-scale, 1) * 1px);
   font-weight: 700;
   color: var(--tron-cyan);
   text-shadow: var(--tron-glow-cyan);
@@ -25,14 +25,14 @@
 }
 
 .statValue {
-  font-size: 22px;
+  font-size: calc(22 * var(--font-scale, 1) * 1px);
   font-weight: 700;
   color: var(--tron-cyan);
   text-shadow: var(--tron-glow-cyan);
 }
 
 .statLabel {
-  font-size: 10px;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
   color: var(--tron-text-dim);
   letter-spacing: 1px;
   margin-top: 4px;
@@ -42,7 +42,7 @@
   background: var(--tron-panel);
   border: 1px solid var(--tron-border);
   padding: 20px;
-  margin-bottom: 16px;
+  margin-bottom: calc(var(--density-padding) + 6px);
   background-image:
     linear-gradient(rgba(0, 245, 255, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 245, 255, 0.03) 1px, transparent 1px);
@@ -50,14 +50,14 @@
 }
 
 .chartTitle {
-  font-size: 11px;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
   letter-spacing: 2px;
   color: var(--tron-text-dim);
   margin-bottom: 16px;
 }
 
 .contextNote {
-  font-size: 10px;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
   color: var(--tron-text-dim);
   letter-spacing: 1px;
   margin-top: 8px;
@@ -68,7 +68,7 @@
   text-align: center;
   color: var(--tron-text-dim);
   letter-spacing: 2px;
-  font-size: 12px;
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
   padding: 40px;
 }
 
@@ -76,7 +76,7 @@
 .sessionTable {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
 }
 
 .tableHeader {
@@ -86,7 +86,7 @@
 .thLeft,
 .thRight,
 .thBar {
-  font-size: 10px;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
   letter-spacing: 1px;
   color: var(--tron-text-dim);
   font-weight: 400;
@@ -167,7 +167,7 @@
   border: 1px solid var(--tron-border);
   color: var(--tron-text-dim);
   font-family: inherit;
-  font-size: 10px;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
   letter-spacing: 2px;
   padding: 4px 14px;
   cursor: pointer;

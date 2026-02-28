@@ -14,8 +14,10 @@
   --tron-glow-cyan: 0 0 8px #00f5ff, 0 0 20px rgba(0,245,255,0.3);
   --tron-glow-orange: 0 0 8px #ff6600, 0 0 16px rgba(255,102,0,0.3);
   --sidebar-width: 220px;
+  --density-padding: 10px;
+  --density-gap: 6px;
   font-family: 'JetBrains Mono', 'Courier New', monospace;
-  font-size: 13px;
+  font-size: calc(13 * var(--font-scale, 1) * 1px);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -49,20 +51,12 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: var(--tron-cyan); }
 
 /* ── Density overrides ──────────────────────────────────────── */
-[data-density="compact"] .cardItem,
-[data-density="compact"] .navItem {
-  padding-top: 6px;
-  padding-bottom: 6px;
-}
-[data-density="compact"] .section {
-  padding: 8px 0;
+[data-density="compact"] {
+  --density-padding: 6px;
+  --density-gap: 4px;
 }
 
-[data-density="comfortable"] .cardItem,
-[data-density="comfortable"] .navItem {
-  padding-top: 14px;
-  padding-bottom: 14px;
-}
-[data-density="comfortable"] .section {
-  padding: 18px 0;
+[data-density="comfortable"] {
+  --density-padding: 14px;
+  --density-gap: 10px;
 }

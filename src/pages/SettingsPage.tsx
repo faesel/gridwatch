@@ -46,7 +46,8 @@ export function applySettings(s: AppSettings): void {
   if (typeof window !== 'undefined' && window.gridwatchAPI?.setZoomFactor) {
     window.gridwatchAPI.setZoomFactor(s.zoom)
   }
-  document.body.style.fontSize = `${s.fontSize}px`
+  // Scale all font sizes via CSS variable (base is 13px, so scale = chosen/13)
+  document.documentElement.style.setProperty('--font-scale', String(s.fontSize / 13))
   document.documentElement.setAttribute('data-density', s.spacing)
   document.documentElement.setAttribute('data-theme', s.theme ?? 'grid')
 }

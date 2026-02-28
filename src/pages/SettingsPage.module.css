@@ -1,10 +1,10 @@
 .page {
-  padding: 24px;
+  padding: calc(var(--density-padding) + 14px);
   max-width: 640px;
 }
 
 .pageTitle {
-  font-size: 18px;
+  font-size: calc(18 * var(--font-scale, 1) * 1px);
   font-weight: 700;
   color: var(--tron-cyan);
   text-shadow: var(--tron-glow-cyan);
@@ -15,12 +15,12 @@
 .panel {
   background: var(--tron-panel);
   border: 1px solid var(--tron-border);
-  padding: 20px 24px;
-  margin-bottom: 16px;
+  padding: calc(var(--density-padding) + 10px) 24px;
+  margin-bottom: calc(var(--density-padding) + 6px);
 }
 
 .sectionTitle {
-  font-size: 10px;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
   font-weight: 700;
   letter-spacing: 2px;
   color: var(--tron-blue);
@@ -28,7 +28,7 @@
 }
 
 .description {
-  font-size: 11px;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
   color: var(--tron-text-dim);
   letter-spacing: 0.5px;
   margin-bottom: 16px;
@@ -51,7 +51,7 @@
   color: var(--tron-text);
   cursor: pointer;
   font-family: inherit;
-  font-size: 11px;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
   font-weight: 600;
   letter-spacing: 1px;
   padding: 10px 16px;
@@ -76,7 +76,7 @@
 }
 
 .presetSub {
-  font-size: 9px;
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
   font-weight: 400;
   color: var(--tron-text-dim);
   letter-spacing: 0;
@@ -103,7 +103,7 @@
   color: var(--tron-orange);
   cursor: pointer;
   font-family: inherit;
-  font-size: 11px;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
   font-weight: 700;
   letter-spacing: 2px;
   padding: 10px 24px;
@@ -150,9 +150,9 @@
 .themeBtnPrograms:hover { background: rgba(255, 26, 60, 0.1); border-color: rgba(255, 26, 60, 0.4); }
 .themeBtnPrograms.themeBtnActive { background: rgba(255, 26, 60, 0.12); border-color: #ff1a3c; box-shadow: 0 0 12px rgba(255,26,60,0.25); }
 
-.themeIcon { font-size: 24px; }
-.themeLabel { font-size: 11px; font-weight: 700; letter-spacing: 2px; }
-.themeSub { font-size: 10px; opacity: 0.6; letter-spacing: 1px; }
+.themeIcon { font-size: calc(24 * var(--font-scale, 1) * 1px); }
+.themeLabel { font-size: calc(11 * var(--font-scale, 1) * 1px); font-weight: 700; letter-spacing: 2px; }
+.themeSub { font-size: calc(10 * var(--font-scale, 1) * 1px); opacity: 0.6; letter-spacing: 1px; }
 
 /* ── API Key ──────────────────────────────────── */
 .apiKeyRow {
@@ -168,7 +168,7 @@
   border: 1px solid var(--tron-border);
   color: var(--tron-text);
   font-family: inherit;
-  font-size: 12px;
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
   padding: 7px 10px;
   outline: none;
   letter-spacing: 1px;
@@ -188,7 +188,7 @@
   border: 1px solid var(--tron-border);
   color: var(--tron-text-dim);
   cursor: pointer;
-  font-size: 14px;
+  font-size: calc(14 * var(--font-scale, 1) * 1px);
   padding: 5px 10px;
   font-family: inherit;
   transition: all 0.15s;
@@ -204,7 +204,7 @@
   border: 1px solid var(--tron-border);
   color: var(--tron-text-dim);
   cursor: pointer;
-  font-size: 10px;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
   letter-spacing: 1px;
   padding: 6px 10px;
   font-family: inherit;
@@ -218,7 +218,7 @@
 
 .apiKeyStatus {
   margin-top: 6px;
-  font-size: 10px;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
   letter-spacing: 1px;
   color: var(--tron-cyan);
 }
