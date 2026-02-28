@@ -16,7 +16,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 }
 
 const STORAGE_KEY = 'gridwatch-settings'
-const API_KEY_STORAGE_KEY = 'gridwatch-openai-key'
+const API_KEY_STORAGE_KEY = 'gridwatch-github-token'
 
 export function loadApiKey(): string {
   try { return localStorage.getItem(API_KEY_STORAGE_KEY) || '' } catch { return '' }
@@ -188,17 +188,18 @@ export default function SettingsPage({ settings, onChange }: Props) {
         </div>
       </div>
 
-      {/* OpenAI API Key */}
+      {/* GitHub Token for Insights */}
       <div className={styles.panel}>
-        <div className={styles.sectionTitle}>OPENAI API KEY</div>
+        <div className={styles.sectionTitle}>GITHUB PERSONAL ACCESS TOKEN</div>
         <div className={styles.description}>
-          Required for the Insights tab. Your key is stored locally and only sent to OpenAI.
+          Required for the Insights tab. Uses GitHub Models API (free with Copilot subscription).
+          Create a token at <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--tron-cyan)' }}>github.com/settings/tokens</a> — no scopes needed.
         </div>
         <div className={styles.apiKeyRow}>
           <input
             className={styles.apiKeyInput}
             type={showKey ? 'text' : 'password'}
-            placeholder="sk-..."
+            placeholder="ghp_..."
             value={apiKey}
             onChange={(e) => {
               setApiKey(e.target.value)
@@ -223,7 +224,7 @@ export default function SettingsPage({ settings, onChange }: Props) {
             </button>
           )}
         </div>
-        {apiKey && <div className={styles.apiKeyStatus}>✓ KEY SAVED</div>}
+        {apiKey && <div className={styles.apiKeyStatus}>✓ TOKEN SAVED</div>}
       </div>
 
       {/* Reset */}

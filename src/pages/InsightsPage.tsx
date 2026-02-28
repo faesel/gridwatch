@@ -40,7 +40,7 @@ export default function InsightsPage({ sessions }: Props) {
     if (!selected) return
     const apiKey = loadApiKey()
     if (!apiKey) {
-      setError('No OpenAI API key set. Go to Settings → OpenAI API Key to add one.')
+      setError('No GitHub token set. Go to Settings → GitHub Personal Access Token to add one.')
       return
     }
 

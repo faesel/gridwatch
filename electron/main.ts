@@ -515,7 +515,7 @@ Keep feedback concise and actionable. Max 5 suggestions.`
 
 ipcMain.handle(
   'insights:analyse',
-  async (_e, apiKey: string, messages: string[]) => {
+  async (_e, token: string, messages: string[]) => {
     return new Promise((resolve, reject) => {
       const body = JSON.stringify({
         model: 'gpt-4o-mini',
@@ -529,12 +529,12 @@ ipcMain.handle(
 
       const req = https.request(
         {
-          hostname: 'api.openai.com',
-          path: '/v1/chat/completions',
+          hostname: 'models.inference.ai.azure.com',
+          path: '/chat/completions',
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
+            Authorization: `Bearer ${token}`,
           },
         },
         (res) => {
@@ -544,7 +544,7 @@ ipcMain.handle(
             try {
               const json = JSON.parse(data)
               if (json.error) {
-                reject(new Error(json.error.message || 'OpenAI API error'))
+                reject(new Error(json.error.message || 'GitHub Models API error'))
                 return
               }
               const content = json.choices?.[0]?.message?.content || ''
@@ -553,12 +553,12 @@ ipcMain.handle(
               const result = JSON.parse(cleaned)
               resolve(result)
             } catch (err) {
-              reject(new Error(`Failed to parse OpenAI response: ${(err as Error).message}`))
+              reject(new Error(`Failed to parse response: ${(err as Error).message}`))
             }
           })
         },
       )
-      req.on('error', (err) => reject(new Error(`OpenAI request failed: ${err.message}`)))
+      req.on('error', (err) => reject(new Error(`GitHub Models request failed: ${err.message}`)))
       req.write(body)
       req.end()
     })
