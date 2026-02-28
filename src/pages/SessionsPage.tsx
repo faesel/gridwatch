@@ -76,6 +76,7 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
   const [expandedTransfer, setExpandedTransfer] = useState<string | null>(null)
   const [transferContent, setTransferContent] = useState<string | null>(null)
   const [copiedResume, setCopiedResume] = useState(false)
+  const [copiedTransfer, setCopiedTransfer] = useState<string | null>(null)
 
   // Sync localTags, localNotes, and transfers when selected session changes
   useEffect(() => {
@@ -582,6 +583,18 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
                     <span className={styles.transferDate}>
                       {new Date(t.date).toLocaleDateString()}
                     </span>
+                    <button
+                      className={styles.transferCopy}
+                      onClick={() => {
+                        const cmd = `Can you gain context using the transferred context file in this sessions session folder`
+                        navigator.clipboard.writeText(cmd)
+                        setCopiedTransfer(t.name)
+                        setTimeout(() => setCopiedTransfer(null), 1500)
+                      }}
+                      aria-label={`Copy prompt for ${t.name}`}
+                    >
+                      {copiedTransfer === t.name ? '✓' : '📋'}
+                    </button>
                     <button
                       className={styles.transferDelete}
                       onClick={() => deleteTransfer(t.name)}

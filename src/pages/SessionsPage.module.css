@@ -823,6 +823,20 @@
   flex-shrink: 0;
 }
 
+.transferCopy {
+  background: none;
+  border: none;
+  color: var(--tron-text-dim);
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.transferCopy:hover {
+  color: var(--tron-cyan);
+}
+
 .transferDelete {
   background: none;
   border: none;
