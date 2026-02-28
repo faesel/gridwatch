@@ -217,12 +217,22 @@ export default function TransferPage({ sessions }: Props) {
           {/* Transfer actions */}
           {target && hasContent && (
             <div className={styles.actions}>
-              <button className={styles.transferBtn} onClick={transferPlan} disabled={generating}>
-                📋 COPY CONTEXT
-              </button>
-              <button className={styles.transferBtn} onClick={generateAndTransfer} disabled={generating}>
-                {generating ? 'GENERATING…' : '⚡ AI SUMMARY'}
-              </button>
+              <div className={styles.actionCard}>
+                <button className={styles.transferBtn} onClick={transferPlan} disabled={generating}>
+                  📋 COPY CONTEXT
+                </button>
+                <div className={styles.actionInfo}>
+                  Copies the raw plan, checkpoints, notes, and tags verbatim from the source session into the target. No API key required.
+                </div>
+              </div>
+              <div className={styles.actionCard}>
+                <button className={styles.transferBtn} onClick={generateAndTransfer} disabled={generating}>
+                  {generating ? 'GENERATING…' : '⚡ AI SUMMARY'}
+                </button>
+                <div className={styles.actionInfo}>
+                  Uses AI to condense the source context into a short, actionable brief. Requires a GitHub token configured in Settings.
+                </div>
+              </div>
             </div>
           )}
 

@@ -101,7 +101,22 @@
 
 .actions {
   display: flex;
-  gap: 10px;
+  gap: 16px;
+}
+
+.actionCard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.actionInfo {
+  color: var(--tron-text-dim);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  line-height: 1.5;
+  letter-spacing: 0.3px;
+  padding: 0 2px;
 }
 
 .transferBtn {
@@ -114,6 +129,7 @@
   padding: 8px 18px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
+  width: 100%;
 }
 
 .transferBtn:hover:not(:disabled) {
