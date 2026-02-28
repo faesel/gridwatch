@@ -587,7 +587,7 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
                       className={styles.transferCopy}
                       onClick={() => {
                         const transferPath = `~/.copilot/session-state/${selectedSession.id}/${t.name}`
-                        const cmd = `cd ${selectedSession.cwd} && copilot "Can you gain context using the transferred context file at ${transferPath}"`
+                        const cmd = `Can you gain context using the transferred context file at ${transferPath}`
                         navigator.clipboard.writeText(cmd)
                         setCopiedTransfer(t.name)
                         setTimeout(() => setCopiedTransfer(null), 1500)
