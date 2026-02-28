@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import type { SessionData } from '../types/session'
 import styles from './SessionsPage.module.css'
 
@@ -516,6 +517,59 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
               </div>
             </div>
           )}
+
+          {/* Context Composition Donut */}
+          {(() => {
+            const cc = selectedSession.contextComposition
+            if (!cc || (cc.userMessages + cc.assistantMessages + cc.toolCalls + cc.subagents) === 0) return null
+            const COLORS = ['#00f5ff', '#0080ff', '#ff6600', '#8b5cf6', '#10b981']
+            const data = [
+              { name: 'User Messages', value: cc.userMessages },
+              { name: 'Assistant Turns', value: cc.assistantMessages },
+              { name: 'Tool Calls', value: cc.toolCalls },
+              { name: 'Sub-agents', value: cc.subagents },
+              { name: 'Compactions', value: cc.compactions },
+            ].filter(d => d.value > 0)
+            const total = data.reduce((s, d) => s + d.value, 0)
+            return (
+              <div className={styles.section}>
+                <div className={styles.sectionTitle}>SESSION COMPOSITION</div>
+                <div className={styles.donutWrapper}>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <PieChart>
+                      <Pie
+                        data={data}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={45}
+                        outerRadius={70}
+                        paddingAngle={2}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {data.map((_, i) => (
+                          <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ background: '#0a0e1f', border: '1px solid #1a2a4a', color: '#c0e8ff', fontSize: 11 }}
+                        formatter={(value: number | undefined, name: string | undefined) => [`${value ?? 0} (${(((value ?? 0) / total) * 100).toFixed(0)}%)`, name ?? '']}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className={styles.donutLegend}>
+                    {data.map((d, i) => (
+                      <div key={d.name} className={styles.legendItem}>
+                        <span className={styles.legendDot} style={{ background: COLORS[i % COLORS.length] }} />
+                        <span className={styles.legendLabel}>{d.name}</span>
+                        <span className={styles.legendValue}>{d.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Tags */}
           <div className={styles.section}>
