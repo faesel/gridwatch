@@ -4,6 +4,16 @@ export interface TokenDataPoint {
   utilisation: number;
 }
 
+export interface CompactionEvent {
+  timestamp: string;
+  triggerUtilisation: number;
+  forced: boolean;
+  messagesReplaced?: number;
+  newMessages?: number;
+  tokensSaved?: number;
+  summary?: string;
+}
+
 export interface RewindSnapshot {
   snapshotId: string;
   userMessage: string;
@@ -40,4 +50,6 @@ export interface SessionData {
   peakTokens: number;
   peakUtilisation: number;
   tokenHistory: TokenDataPoint[];
+  compactions: CompactionEvent[];
+  isResearch: boolean;
 }

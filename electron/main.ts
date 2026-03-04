@@ -5,7 +5,7 @@ import path from 'node:path'
 import os from 'node:os'
 import fs from 'node:fs'
 import https from 'node:https'
-import type { SessionData, TokenDataPoint, RewindSnapshot } from '../src/types/session'
+import type { SessionData, TokenDataPoint, RewindSnapshot, CompactionEvent } from '../src/types/session'
 
 // Must be set before app is ready so the OS picks it up for dock/taskbar tooltip
 app.setName('GridWatch')
@@ -116,11 +116,12 @@ function parseTokenLine(line: string): { tokens: number; utilisation: number } |
 function readLogTokenHistory(
   logDir: string,
   createdAt: string,
-): { tokenHistory: TokenDataPoint[]; peakTokens: number; peakUtilisation: number } {
+): { tokenHistory: TokenDataPoint[]; peakTokens: number; peakUtilisation: number; compactions: CompactionEvent[] } {
+  const empty = { tokenHistory: [], peakTokens: 0, peakUtilisation: 0, compactions: [] }
   try {
     const sessionTime = new Date(createdAt).getTime()
     const files = fs.readdirSync(logDir).filter((f) => f.startsWith('process-') && f.endsWith('.log'))
-    if (files.length === 0) return { tokenHistory: [], peakTokens: 0, peakUtilisation: 0 }
+    if (files.length === 0) return empty
 
     // Find log file whose timestamp is closest to session createdAt
     let bestFile = ''
@@ -135,7 +136,7 @@ function readLogTokenHistory(
         bestFile = f
       }
     }
-    if (!bestFile) return { tokenHistory: [], peakTokens: 0, peakUtilisation: 0 }
+    if (!bestFile) return empty
 
     const content = fs.readFileSync(path.join(logDir, bestFile), 'utf-8')
     const lines = content.split('\n')
@@ -143,21 +144,77 @@ function readLogTokenHistory(
     let peakTokens = 0
     let peakUtilisation = 0
 
+    // Compaction tracking
+    const compactions: CompactionEvent[] = []
+    let pendingCompaction: { timestamp: string; triggerUtilisation: number; forced: boolean; summary?: string } | null = null
+
     for (const line of lines) {
-      if (!line.includes('CompactionProcessor') && !line.includes('Utiliz')) continue
-      const parsed = parseTokenLine(line)
-      if (!parsed) continue
-      // Try to extract timestamp from log line prefix e.g. [2024-01-01T12:00:00.000Z]
+      if (!line.includes('CompactionProcessor') && !line.includes('Utiliz') && !line.includes('Persisted checkpoint')) continue
       const tsMatch = line.match(/\[?([\d]{4}-[\d]{2}-[\d]{2}T[\d:\.]+Z)\]?/)
       const timestamp = tsMatch ? tsMatch[1] : new Date().toISOString()
-      tokenHistory.push({ timestamp, tokens: parsed.tokens, utilisation: parsed.utilisation })
-      if (parsed.tokens > peakTokens) peakTokens = parsed.tokens
-      if (parsed.utilisation > peakUtilisation) peakUtilisation = parsed.utilisation
+
+      // Token utilisation line
+      const parsed = parseTokenLine(line)
+      if (parsed) {
+        tokenHistory.push({ timestamp, tokens: parsed.tokens, utilisation: parsed.utilisation })
+        if (parsed.tokens > peakTokens) peakTokens = parsed.tokens
+        if (parsed.utilisation > peakUtilisation) peakUtilisation = parsed.utilisation
+        continue
+      }
+
+      // Compaction started
+      const startMatch = line.match(/Context at ([\d.]+)% utilization(\s*\(forced\))?\s*-\s*starting background compaction/)
+      if (startMatch) {
+        pendingCompaction = {
+          timestamp,
+          triggerUtilisation: parseFloat(startMatch[1]),
+          forced: !!startMatch[2],
+        }
+        continue
+      }
+
+      // Persisted checkpoint summary (appears between compaction start and complete)
+      const checkpointMatch = line.match(/Persisted checkpoint #\d+:\s*(.+)/)
+      if (checkpointMatch && pendingCompaction) {
+        pendingCompaction.summary = checkpointMatch[1].trim()
+        continue
+      }
+
+      // Compaction completed with details
+      const completeMatch = line.match(/Compaction complete - replaced (\d+) messages with summary \+ (\d+) new messages, saved ~(\d+) tokens/)
+      if (completeMatch) {
+        compactions.push({
+          timestamp: pendingCompaction?.timestamp ?? timestamp,
+          triggerUtilisation: pendingCompaction?.triggerUtilisation ?? 0,
+          forced: pendingCompaction?.forced ?? false,
+          messagesReplaced: parseInt(completeMatch[1], 10),
+          newMessages: parseInt(completeMatch[2], 10),
+          tokensSaved: parseInt(completeMatch[3], 10),
+          summary: pendingCompaction?.summary,
+        })
+        pendingCompaction = null
+        continue
+      }
+
+      // Background compaction completed (no details) — flush pending
+      if (line.includes('Background compaction completed successfully') && pendingCompaction) {
+        // Don't flush yet — wait for the "Compaction complete" detail line
+      }
     }
 
-    return { tokenHistory, peakTokens, peakUtilisation }
+    // Flush any unmatched start (compaction interrupted)
+    if (pendingCompaction) {
+      compactions.push({
+        timestamp: pendingCompaction.timestamp,
+        triggerUtilisation: pendingCompaction.triggerUtilisation,
+        forced: pendingCompaction.forced,
+        summary: pendingCompaction.summary,
+      })
+    }
+
+    return { tokenHistory, peakTokens, peakUtilisation, compactions }
   } catch {
-    return { tokenHistory: [], peakTokens: 0, peakUtilisation: 0 }
+    return empty
   }
 }
 
@@ -291,9 +348,13 @@ ipcMain.handle('sessions:get-all', async (): Promise<SessionData[]> => {
         }
 
         // Token history from log
-        const { tokenHistory, peakTokens, peakUtilisation } = fs.existsSync(logDir)
+        const { tokenHistory, peakTokens, peakUtilisation, compactions } = fs.existsSync(logDir)
           ? readLogTokenHistory(logDir, createdAt)
-          : { tokenHistory: [], peakTokens: 0, peakUtilisation: 0 }
+          : { tokenHistory: [], peakTokens: 0, peakUtilisation: 0, compactions: [] }
+
+        // Detect research sessions
+        const firstUserMsg = userMessages[0]?.content ?? ''
+        const isResearch = firstUserMsg.startsWith('Researching: ')
 
         resolve({
           id: workspace.id || entry,
@@ -335,6 +396,8 @@ ipcMain.handle('sessions:get-all', async (): Promise<SessionData[]> => {
           peakTokens,
           peakUtilisation,
           tokenHistory,
+          compactions,
+          isResearch,
         })
       } catch {
         resolve(null)

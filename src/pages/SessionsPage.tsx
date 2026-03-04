@@ -63,6 +63,7 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
   const [search, setSearch] = useState('')
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
   const [showTagFilter, setShowTagFilter] = useState(false)
+  const [typeFilter, setTypeFilter] = useState<'all' | 'research' | 'coding'>('all')
   const [page, setPage] = useState(0)
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState('')
@@ -209,6 +210,9 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
   const clearTagFilter = () => setSelectedTags(new Set())
 
   const filtered = useMemo(() => sessions.filter((s) => {
+    // Type filter
+    if (typeFilter === 'research' && !s.isResearch) return false
+    if (typeFilter === 'coding' && s.isResearch) return false
     // Tag filter: session must have ALL selected tags
     if (selectedTags.size > 0) {
       const sessionTags = s.tags ?? []
@@ -225,13 +229,13 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
       (s.branch || '').toLowerCase().includes(q) ||
       (s.tags ?? []).some((t) => t.toLowerCase().includes(q))
     )
-  }), [sessions, selectedTags, search])
+  }), [sessions, selectedTags, search, typeFilter])
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
-  // Reset to first page when search or tag filter changes
-  useEffect(() => { setPage(0) }, [search, selectedTags])
+  // Reset to first page when search or filter changes
+  useEffect(() => { setPage(0) }, [search, selectedTags, typeFilter])
 
   const totalCount = sessions.length
   const todayCount = useMemo(() => sessions.filter((s) => isToday(s.createdAt)).length, [sessions])
@@ -271,6 +275,17 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
               ⊞ TAGS{selectedTags.size > 0 ? ` (${selectedTags.size})` : ''}
             </button>
           )}
+          <div className={styles.typeFilter}>
+            {(['all', 'research', 'coding'] as const).map((t) => (
+              <button
+                key={t}
+                className={`${styles.typeFilterBtn} ${typeFilter === t ? styles.typeFilterBtnActive : ''}`}
+                onClick={() => setTypeFilter(t)}
+              >
+                {t.toUpperCase()}
+              </button>
+            ))}
+          </div>
         </div>
         {showTagFilter && allTags.length > 0 && (
           <div className={styles.tagFilterPanel}>
@@ -334,11 +349,13 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
                 </div>
                 <div className={styles.cardRow3}>
                   <span>{formatRelativeTime(session.updatedAt)}</span>
-                  <span>{session.turnCount} turns</span>
                   {session.peakUtilisation > 0 && (
                     <span className={styles.cardUtil}>
                       {session.peakUtilisation.toFixed(1)}% ctx
                     </span>
+                  )}
+                  {session.isResearch && (
+                    <span className={styles.researchBadge}>RESEARCH</span>
                   )}
                 </div>
                 {(session.tags ?? []).length > 0 && (
@@ -395,6 +412,9 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
               <>
                 <div className={styles.detailSummary}>
                   {selectedSession.summary || 'SESSION DETAIL'}
+                  {selectedSession.isResearch && (
+                    <span className={styles.researchBadgeDetail}>RESEARCH</span>
+                  )}
                 </div>
                 <div className={styles.detailActions}>
                   <button className={styles.renameBtn} onClick={startRename} title="Rename session">✎</button>
@@ -514,6 +534,39 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
                 <span className={styles.tokenBarLabel}>
                   {selectedSession.peakTokens.toLocaleString()} tokens
                 </span>
+              </div>
+            </div>
+          )}
+
+          {/* Compactions */}
+          {(selectedSession.compactions ?? []).length > 0 && (
+            <div className={styles.section}>
+              <div className={styles.sectionTitle}>
+                COMPACTIONS ({selectedSession.compactions.length})
+              </div>
+              <div className={styles.compactionList}>
+                {selectedSession.compactions.map((c, i) => (
+                  <div key={i} className={styles.compactionItem}>
+                    <div className={styles.compactionHeader}>
+                      <span className={styles.compactionTime}>
+                        {new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <span className={styles.compactionTrigger}>
+                        {c.triggerUtilisation > 0 ? `${c.triggerUtilisation.toFixed(1)}%` : '—'}
+                        {c.forced && <span className={styles.compactionForced}> FORCED</span>}
+                      </span>
+                    </div>
+                    {c.summary && (
+                      <div className={styles.compactionSummary}>{c.summary}</div>
+                    )}
+                    {c.tokensSaved != null && (
+                      <div className={styles.compactionStats}>
+                        <span>{c.messagesReplaced} msgs → {c.newMessages} summary</span>
+                        <span className={styles.compactionSaved}>−{c.tokensSaved.toLocaleString()} tokens</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}

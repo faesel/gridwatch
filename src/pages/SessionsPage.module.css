@@ -924,3 +924,118 @@
   color: var(--tron-cyan);
   border-color: var(--tron-cyan);
 }
+
+/* ── Type filter ──────────────────────────────────── */
+.typeFilter {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.typeFilterBtn {
+  background: none;
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text-dim);
+  font-family: inherit;
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border-radius: 2px;
+}
+
+.typeFilterBtn:hover {
+  border-color: var(--tron-cyan);
+  color: var(--tron-cyan);
+}
+
+.typeFilterBtnActive {
+  background: rgba(0, 245, 255, 0.12);
+  border-color: var(--tron-cyan);
+  color: var(--tron-cyan);
+  text-shadow: var(--tron-glow-cyan);
+}
+
+/* ── Research badge ──────────────────────────────── */
+.researchBadge {
+  font-size: calc(8 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 1px 5px;
+  border: 1px solid var(--tron-blue);
+  color: var(--tron-blue);
+  border-radius: 2px;
+}
+
+.researchBadgeDetail {
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 2px 7px;
+  margin-left: 8px;
+  border: 1px solid var(--tron-blue);
+  color: var(--tron-blue);
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+/* ── Compaction list ─────────────────────────────── */
+.cardCompactions {
+  color: var(--tron-text-dim);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+}
+
+.compactionList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.compactionItem {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--tron-border);
+  padding: 8px 10px;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+}
+
+.compactionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.compactionTime {
+  color: var(--tron-text-dim);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 0.5px;
+}
+
+.compactionTrigger {
+  color: var(--tron-orange);
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+}
+
+.compactionForced {
+  font-size: calc(8 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  opacity: 0.8;
+}
+
+.compactionStats {
+  display: flex;
+  justify-content: space-between;
+  color: var(--tron-text-dim);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+}
+
+.compactionSummary {
+  color: var(--tron-text);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  margin-bottom: 4px;
+  font-style: italic;
+  opacity: 0.85;
+}
+
+.compactionSaved {
+  color: var(--tron-cyan);
+}
