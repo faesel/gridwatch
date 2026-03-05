@@ -168,6 +168,7 @@ GridWatch reads exclusively from local files — no network requests are made ex
 | Rewind snapshots | `~/.copilot/session-state/<uuid>/rewind-snapshots/index.json` |
 | Research reports | `~/.copilot/session-state/<uuid>/research/*.md` |
 | Token usage & compaction | `~/.copilot/logs/process-<timestamp>-<pid>.log` |
+| Archived sessions | `~/.copilot/session-state-archived/<uuid>/` (moved here by GridWatch archive) |
 | Session tags / custom data | `~/.copilot/session-state/<uuid>/gridwatch.json` (written by GridWatch) |
 | Copilot skills | `~/.copilot/skills/<name>/SKILL.md` (read/write for skill management) |
 | Disabled skills | `~/.copilot/skills-disabled/<name>/` (moved here when toggled off) |
