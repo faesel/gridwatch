@@ -1,0 +1,564 @@
+.page {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── List column ─────────────────────────────── */
+.listColumn {
+  width: 340px;
+  min-width: 260px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--tron-border);
+  height: 100%;
+  overflow: hidden;
+}
+
+.listColumnFull {
+  width: 100%;
+  flex: 1;
+}
+
+.toolbar {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px 0;
+}
+
+.toolbarBtn {
+  flex: 1;
+  background: var(--tron-panel);
+  border: 1px solid var(--tron-border);
+  color: var(--tron-cyan);
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.toolbarBtn:hover {
+  border-color: var(--tron-cyan);
+  box-shadow: var(--tron-glow-cyan);
+}
+
+.searchWrap {
+  padding: 10px 12px 8px;
+}
+
+.searchInput {
+  width: 100%;
+  background: var(--tron-bg);
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text);
+  font-family: inherit;
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.searchInput::placeholder {
+  color: var(--tron-text-dim);
+}
+
+.searchInput:focus {
+  border-color: var(--tron-cyan);
+}
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.card {
+  padding: 10px 12px;
+  margin: 2px 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  border-radius: 2px;
+}
+
+.card:hover {
+  background: var(--tron-panel-hover);
+  border-color: var(--tron-border);
+}
+
+.cardActive {
+  background: var(--tron-panel);
+  border-color: var(--tron-cyan);
+}
+
+.cardName {
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
+  color: var(--tron-cyan);
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.disabledBadge {
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  color: var(--tron-orange);
+  border: 1px solid var(--tron-orange);
+  padding: 1px 5px;
+  letter-spacing: 1px;
+}
+
+.cardDesc {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cardMeta {
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  margin-top: 4px;
+  display: flex;
+  gap: 10px;
+}
+
+.cardDisabled {
+  opacity: 0.5;
+}
+
+.emptyState {
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--tron-text-dim);
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+}
+
+/* ── Detail column ───────────────────────────── */
+.detailColumn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.detailHeader {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--tron-border);
+}
+
+.detailTitle {
+  font-size: calc(16 * var(--font-scale, 1) * 1px);
+  color: var(--tron-cyan);
+  letter-spacing: 1px;
+  margin-bottom: 2px;
+}
+
+.folderSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--tron-border);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.folderLabel {
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  letter-spacing: 1.5px;
+  opacity: 0.7;
+}
+
+.folderValue {
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text);
+  letter-spacing: 0.5px;
+}
+
+.folderRenameBtn {
+  background: none;
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text-dim);
+  cursor: pointer;
+  font-size: calc(14 * var(--font-scale, 1) * 1px);
+  padding: 2px 8px;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.folderRenameBtn:hover {
+  border-color: var(--tron-orange);
+  color: var(--tron-orange);
+  box-shadow: var(--tron-glow-orange);
+}
+
+.detailDesc {
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  line-height: 1.5;
+}
+
+.detailMeta {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+}
+
+.detailActions {
+  display: flex;
+  gap: 6px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--tron-border);
+  flex-wrap: wrap;
+}
+
+.actionBtn {
+  background: var(--tron-panel);
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text);
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.actionBtn:hover {
+  border-color: var(--tron-cyan);
+  color: var(--tron-cyan);
+}
+
+.actionBtnDanger {
+  composes: actionBtn;
+}
+
+.actionBtnDanger:hover {
+  border-color: var(--tron-orange);
+  color: var(--tron-orange);
+}
+
+.toggleBtn {
+  composes: actionBtn;
+}
+
+.toggleBtnEnabled {
+  border-color: var(--tron-cyan);
+  color: var(--tron-cyan);
+}
+
+.toggleBtnDisabled {
+  border-color: var(--tron-orange);
+  color: var(--tron-orange);
+}
+
+/* ── File tabs ───────────────────────────────── */
+.fileTabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--tron-border);
+  background: var(--tron-panel);
+  overflow-x: auto;
+}
+
+.fileTab {
+  padding: 8px 14px;
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 0.5px;
+  color: var(--tron-text-dim);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.fileTab:hover {
+  color: var(--tron-text);
+}
+
+.fileTabActive {
+  color: var(--tron-cyan);
+  border-bottom-color: var(--tron-cyan);
+}
+
+/* ── Content area ────────────────────────────── */
+.fileContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.markdownView {
+  line-height: 1.7;
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text);
+}
+
+.markdownView h1,
+.markdownView h2,
+.markdownView h3 {
+  color: var(--tron-cyan);
+  margin: 1.2em 0 0.5em;
+  letter-spacing: 0.5px;
+}
+
+.markdownView h1 { font-size: calc(18 * var(--font-scale, 1) * 1px); }
+.markdownView h2 { font-size: calc(15 * var(--font-scale, 1) * 1px); }
+.markdownView h3 { font-size: calc(13 * var(--font-scale, 1) * 1px); }
+
+.markdownView p {
+  margin: 0.6em 0;
+}
+
+.markdownView code {
+  background: rgba(0, 128, 255, 0.1);
+  color: var(--tron-blue);
+  padding: 2px 5px;
+  border-radius: 2px;
+  font-size: 0.9em;
+}
+
+.markdownView pre {
+  background: var(--tron-bg);
+  border: 1px solid var(--tron-border);
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 0.8em 0;
+  border-radius: 2px;
+}
+
+.markdownView pre code {
+  background: none;
+  padding: 0;
+  color: var(--tron-text);
+}
+
+.markdownView ul,
+.markdownView ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.markdownView li {
+  margin: 0.3em 0;
+}
+
+.markdownView a {
+  color: var(--tron-cyan);
+  text-decoration: none;
+}
+
+.markdownView a:hover {
+  text-decoration: underline;
+}
+
+.markdownView strong {
+  color: var(--tron-cyan);
+}
+
+.markdownView blockquote {
+  border-left: 3px solid var(--tron-border);
+  padding-left: 12px;
+  color: var(--tron-text-dim);
+  margin: 0.8em 0;
+}
+
+.markdownView hr {
+  border: none;
+  border-top: 1px solid var(--tron-border);
+  margin: 1.5em 0;
+}
+
+/* ── Editor ──────────────────────────────────── */
+.editorWrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editorToolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--tron-border);
+}
+
+.editorArea {
+  flex: 1;
+  width: 100%;
+  background: var(--tron-bg);
+  color: var(--tron-text);
+  border: none;
+  font-family: inherit;
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
+  padding: 16px 20px;
+  resize: none;
+  outline: none;
+  line-height: 1.6;
+}
+
+.unsavedBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 20px;
+  background: rgba(255, 102, 0, 0.1);
+  border-bottom: 1px solid var(--tron-orange);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  color: var(--tron-orange);
+  letter-spacing: 0.5px;
+}
+
+/* ── Confirm dialog ──────────────────────────── */
+.confirmOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.confirmDialog {
+  background: var(--tron-panel);
+  border: 1px solid var(--tron-border);
+  padding: 24px;
+  min-width: 340px;
+  max-width: 440px;
+}
+
+.confirmTitle {
+  color: var(--tron-cyan);
+  font-size: calc(13 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+
+.confirmText {
+  color: var(--tron-text-dim);
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.confirmInput {
+  width: 100%;
+  background: var(--tron-bg);
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text);
+  font-family: inherit;
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
+  padding: 7px 10px;
+  outline: none;
+  margin-bottom: 8px;
+}
+
+.confirmInput:focus {
+  border-color: var(--tron-cyan);
+}
+
+.confirmTextarea {
+  width: 100%;
+  background: var(--tron-bg);
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text);
+  font-family: inherit;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  padding: 7px 10px;
+  outline: none;
+  margin-bottom: 8px;
+  resize: vertical;
+  min-height: 60px;
+}
+
+.confirmTextarea:focus {
+  border-color: var(--tron-cyan);
+}
+
+.confirmActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.confirmBtnCancel {
+  background: none;
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text-dim);
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.confirmBtnOk {
+  background: none;
+  border: 1px solid var(--tron-cyan);
+  color: var(--tron-cyan);
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.confirmBtnDanger {
+  background: none;
+  border: 1px solid var(--tron-orange);
+  color: var(--tron-orange);
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.confirmError {
+  color: var(--tron-orange);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  margin-bottom: 8px;
+}
+
+/* ── Error banner ────────────────────────────── */
+.errorBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px;
+  background: rgba(255, 102, 0, 0.1);
+  border-bottom: 1px solid var(--tron-orange);
+  color: var(--tron-orange);
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+}
+
+.errorDismiss {
+  background: none;
+  border: none;
+  color: var(--tron-orange);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+}
+
+/* ── Usage stat ──────────────────────────────── */
+.usageStat {
+  color: var(--tron-blue);
+}

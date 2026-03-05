@@ -1,4 +1,5 @@
 import type { SessionData } from './session';
+import type { SkillData } from './skill';
 
 export interface PromptFeedback {
   prompt: string;
@@ -41,6 +42,18 @@ declare global {
       saveToken: (token: string) => Promise<boolean>;
       loadToken: () => Promise<string>;
       analyseSession: (apiKey: string, messages: string[]) => Promise<InsightResult>;
+
+      // Skills
+      getSkills: () => Promise<SkillData[]>;
+      getSkillFile: (skillName: string, fileName: string) => Promise<string | null>;
+      saveSkillFile: (skillName: string, fileName: string, content: string) => Promise<boolean>;
+      createSkill: (name: string, description: string) => Promise<{ ok: boolean; error?: string }>;
+      deleteSkill: (skillName: string) => Promise<{ ok: boolean; error?: string }>;
+      renameSkillFolder: (skillName: string, newName: string) => Promise<{ ok: boolean; error?: string }>;
+      duplicateSkill: (skillName: string, newName: string) => Promise<{ ok: boolean; error?: string }>;
+      toggleSkill: (skillName: string) => Promise<{ ok: boolean; error?: string }>;
+      exportSkill: (skillName: string) => Promise<{ ok: boolean; filePath?: string; error?: string }>;
+      importSkill: () => Promise<{ ok: boolean; name?: string; error?: string }>;
     };
   }
   const __APP_VERSION__: string;

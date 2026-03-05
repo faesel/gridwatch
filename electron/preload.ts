@@ -32,4 +32,24 @@ contextBridge.exposeInMainWorld('gridwatchAPI', {
   loadToken: () => ipcRenderer.invoke('app:load-token'),
   analyseSession: (apiKey: string, messages: string[]) =>
     ipcRenderer.invoke('insights:analyse', apiKey, messages),
+
+  // Skills
+  getSkills: () => ipcRenderer.invoke('skills:get-all'),
+  getSkillFile: (skillName: string, fileName: string) =>
+    ipcRenderer.invoke('skills:get-file', skillName, fileName),
+  saveSkillFile: (skillName: string, fileName: string, content: string) =>
+    ipcRenderer.invoke('skills:save-file', skillName, fileName, content),
+  createSkill: (name: string, description: string) =>
+    ipcRenderer.invoke('skills:create', name, description),
+  deleteSkill: (skillName: string) =>
+    ipcRenderer.invoke('skills:delete', skillName),
+  renameSkillFolder: (skillName: string, newName: string) =>
+    ipcRenderer.invoke('skills:rename-folder', skillName, newName),
+  duplicateSkill: (skillName: string, newName: string) =>
+    ipcRenderer.invoke('skills:duplicate', skillName, newName),
+  toggleSkill: (skillName: string) =>
+    ipcRenderer.invoke('skills:toggle', skillName),
+  exportSkill: (skillName: string) =>
+    ipcRenderer.invoke('skills:export', skillName),
+  importSkill: () => ipcRenderer.invoke('skills:import'),
 })

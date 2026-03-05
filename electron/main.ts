@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, nativeImage, shell, safeStorage } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell, safeStorage } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -6,6 +6,7 @@ import os from 'node:os'
 import fs from 'node:fs'
 import https from 'node:https'
 import type { SessionData, TokenDataPoint, RewindSnapshot, CompactionEvent } from '../src/types/session'
+import type { SkillData, SkillFile } from '../src/types/skill'
 
 // Must be set before app is ready so the OS picks it up for dock/taskbar tooltip
 app.setName('GridWatch')
@@ -92,6 +93,8 @@ function isPathWithin(filePath: string, parentDir: string): boolean {
 }
 
 const MAX_TRANSFER_SIZE = 1_048_576 // 1 MB
+
+const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/
 
 // ── IPC response cache ────────────────────────────────────────────────────────
 let sessionsCache: { data: SessionData[]; timestamp: number } | null = null
@@ -911,6 +914,302 @@ ipcMain.handle(
     })
   },
 )
+
+// ── Skills IPC ────────────────────────────────────────────────────────────────
+
+function isValidSkillName(name: string): boolean {
+  return typeof name === 'string' && name.length > 0 && name.length <= 100 && SKILL_NAME_PATTERN.test(name)
+}
+
+function parseSkillFrontmatter(raw: string): { displayName: string; description: string; license: string | undefined } {
+  const result: { displayName: string; description: string; license: string | undefined } = { displayName: '', description: '', license: undefined }
+  const match = raw.match(/^---\s*\n([\s\S]*?)\n---/)
+  if (!match) return result
+  const block = match[1]
+  const nameMatch = block.match(/^name:\s*(.+)$/m)
+  const descMatch = block.match(/^description:\s*(.+)$/m)
+  const licMatch = block.match(/^license:\s*(.+)$/m)
+  if (nameMatch) result.displayName = nameMatch[1].trim()
+  if (descMatch) result.description = descMatch[1].trim()
+  if (licMatch) result.license = licMatch[1].trim()
+  return result
+}
+
+function scanSkillDir(dirPath: string, enabled: boolean): SkillData | null {
+  const skillName = path.basename(dirPath)
+  const skillMdPath = path.join(dirPath, 'SKILL.md')
+  if (!fs.existsSync(skillMdPath)) return null
+
+  let frontmatter = { displayName: skillName, description: '', license: undefined as string | undefined }
+  try {
+    const raw = fs.readFileSync(skillMdPath, 'utf-8')
+    frontmatter = parseSkillFrontmatter(raw)
+    if (!frontmatter.displayName) frontmatter.displayName = skillName
+  } catch { /* use defaults */ }
+
+  const files: SkillFile[] = []
+  let latestMtime = 0
+  let earliestBirth = Date.now()
+  try {
+    for (const fname of fs.readdirSync(dirPath)) {
+      const fpath = path.join(dirPath, fname)
+      const stat = fs.statSync(fpath)
+      if (!stat.isFile()) continue
+      files.push({ name: fname, path: fpath, size: stat.size, modifiedAt: stat.mtime.toISOString() })
+      if (stat.mtimeMs > latestMtime) latestMtime = stat.mtimeMs
+      const birth = stat.birthtimeMs || stat.mtimeMs
+      if (birth < earliestBirth) earliestBirth = birth
+    }
+  } catch { /* skip unreadable */ }
+
+  return {
+    name: skillName,
+    displayName: frontmatter.displayName,
+    description: frontmatter.description,
+    license: frontmatter.license,
+    files,
+    enabled,
+    createdAt: new Date(earliestBirth).toISOString(),
+    modifiedAt: latestMtime ? new Date(latestMtime).toISOString() : new Date().toISOString(),
+  }
+}
+
+ipcMain.handle('skills:get-all', async (): Promise<SkillData[]> => {
+  const skills: SkillData[] = []
+  const enabledDir = path.join(os.homedir(), '.copilot', 'skills')
+  const disabledDir = path.join(os.homedir(), '.copilot', 'skills-disabled')
+
+  for (const [dir, enabled] of [[enabledDir, true], [disabledDir, false]] as const) {
+    if (!fs.existsSync(dir)) continue
+    try {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (!entry.isDirectory() || entry.name.startsWith('.')) continue
+        const skill = scanSkillDir(path.join(dir, entry.name), enabled)
+        if (skill) skills.push(skill)
+      }
+    } catch { /* skip */ }
+  }
+
+  return skills.sort((a, b) => a.displayName.localeCompare(b.displayName))
+})
+
+ipcMain.handle('skills:get-file', async (_e, skillName: string, fileName: string): Promise<string | null> => {
+  if (!isValidSkillName(skillName) || !fileName || typeof fileName !== 'string') return null
+  const enabledDir = path.join(os.homedir(), '.copilot', 'skills')
+  const disabledDir = path.join(os.homedir(), '.copilot', 'skills-disabled')
+
+  for (const base of [enabledDir, disabledDir]) {
+    const filePath = path.join(base, skillName, fileName)
+    if (!isPathWithin(filePath, path.join(base, skillName))) return null
+    if (fs.existsSync(filePath)) {
+      try { return fs.readFileSync(filePath, 'utf-8') } catch { return null }
+    }
+  }
+  return null
+})
+
+ipcMain.handle('skills:save-file', async (_e, skillName: string, fileName: string, content: string): Promise<boolean> => {
+  if (!isValidSkillName(skillName) || !fileName || typeof content !== 'string') return false
+  const enabledDir = path.join(os.homedir(), '.copilot', 'skills')
+  const disabledDir = path.join(os.homedir(), '.copilot', 'skills-disabled')
+
+  for (const base of [enabledDir, disabledDir]) {
+    const skillDir = path.join(base, skillName)
+    const filePath = path.join(skillDir, fileName)
+    if (!isPathWithin(filePath, skillDir)) return false
+    if (fs.existsSync(skillDir)) {
+      try { fs.writeFileSync(filePath, content, 'utf-8'); return true } catch { return false }
+    }
+  }
+  return false
+})
+
+ipcMain.handle('skills:create', async (_e, name: string, description: string): Promise<{ ok: boolean; error?: string }> => {
+  if (!isValidSkillName(name)) return { ok: false, error: 'Invalid skill name. Use lowercase letters, numbers, and hyphens only.' }
+  const skillDir = path.join(os.homedir(), '.copilot', 'skills', name)
+  if (fs.existsSync(skillDir)) return { ok: false, error: 'A skill with this name already exists.' }
+  const disabledDir = path.join(os.homedir(), '.copilot', 'skills-disabled', name)
+  if (fs.existsSync(disabledDir)) return { ok: false, error: 'A disabled skill with this name already exists.' }
+
+  const template = `---\nname: ${name}\ndescription: ${description || 'TODO: Add a description'}\n---\n\n# ${name}\n\nAdd your skill instructions here.\n`
+
+  try {
+    fs.mkdirSync(skillDir, { recursive: true })
+    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), template, 'utf-8')
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('skills:delete', async (_e, skillName: string): Promise<{ ok: boolean; error?: string }> => {
+  if (!isValidSkillName(skillName)) return { ok: false, error: 'Invalid skill name' }
+  const enabledDir = path.join(os.homedir(), '.copilot', 'skills', skillName)
+  const disabledDir = path.join(os.homedir(), '.copilot', 'skills-disabled', skillName)
+  const skillDir = fs.existsSync(enabledDir) ? enabledDir : fs.existsSync(disabledDir) ? disabledDir : null
+  if (!skillDir) return { ok: false, error: 'Skill not found' }
+
+  try {
+    fs.rmSync(skillDir, { recursive: true, force: true })
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('skills:rename-folder', async (_e, skillName: string, newName: string): Promise<{ ok: boolean; error?: string }> => {
+  if (!isValidSkillName(skillName)) return { ok: false, error: 'Invalid skill name' }
+  if (!isValidSkillName(newName)) return { ok: false, error: 'Invalid new name. Use lowercase letters, numbers, and hyphens only.' }
+  if (skillName === newName) return { ok: true }
+  const enabledDir = path.join(os.homedir(), '.copilot', 'skills')
+  const disabledDir = path.join(os.homedir(), '.copilot', 'skills-disabled')
+
+  const srcEnabled = path.join(enabledDir, skillName)
+  const srcDisabled = path.join(disabledDir, skillName)
+  const srcDir = fs.existsSync(srcEnabled) ? srcEnabled : fs.existsSync(srcDisabled) ? srcDisabled : null
+  if (!srcDir) return { ok: false, error: 'Skill not found' }
+
+  const baseDir = path.dirname(srcDir)
+  const destDir = path.join(baseDir, newName)
+  if (fs.existsSync(destDir)) return { ok: false, error: `A skill named "${newName}" already exists` }
+  const otherBase = baseDir === enabledDir ? disabledDir : enabledDir
+  if (fs.existsSync(path.join(otherBase, newName))) return { ok: false, error: `A skill named "${newName}" already exists` }
+
+  try {
+    fs.renameSync(srcDir, destDir)
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('skills:duplicate', async (_e, skillName: string, newName: string): Promise<{ ok: boolean; error?: string }> => {
+  if (!isValidSkillName(skillName)) return { ok: false, error: 'Invalid source skill name' }
+  if (!isValidSkillName(newName)) return { ok: false, error: 'Invalid new skill name. Use lowercase letters, numbers, and hyphens only.' }
+  const enabledDir = path.join(os.homedir(), '.copilot', 'skills')
+  const disabledDir = path.join(os.homedir(), '.copilot', 'skills-disabled')
+
+  const srcDir = fs.existsSync(path.join(enabledDir, skillName)) ? path.join(enabledDir, skillName)
+    : fs.existsSync(path.join(disabledDir, skillName)) ? path.join(disabledDir, skillName) : null
+  if (!srcDir) return { ok: false, error: 'Source skill not found' }
+
+  const destDir = path.join(enabledDir, newName)
+  if (fs.existsSync(destDir)) return { ok: false, error: 'A skill with this name already exists' }
+
+  try {
+    fs.cpSync(srcDir, destDir, { recursive: true })
+    // Update name in frontmatter of the new SKILL.md
+    const skillMd = path.join(destDir, 'SKILL.md')
+    if (fs.existsSync(skillMd)) {
+      const raw = fs.readFileSync(skillMd, 'utf-8')
+      const updated = raw.replace(/^(name:\s*).+$/m, `$1${newName}`)
+      fs.writeFileSync(skillMd, updated, 'utf-8')
+    }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('skills:toggle', async (_e, skillName: string): Promise<{ ok: boolean; error?: string }> => {
+  if (!isValidSkillName(skillName)) return { ok: false, error: 'Invalid skill name' }
+  const enabledDir = path.join(os.homedir(), '.copilot', 'skills')
+  const disabledDir = path.join(os.homedir(), '.copilot', 'skills-disabled')
+
+  const enabledPath = path.join(enabledDir, skillName)
+  const disabledPath = path.join(disabledDir, skillName)
+
+  try {
+    if (fs.existsSync(enabledPath)) {
+      // Disable: move to skills-disabled
+      if (!fs.existsSync(disabledDir)) fs.mkdirSync(disabledDir, { recursive: true })
+      fs.renameSync(enabledPath, disabledPath)
+    } else if (fs.existsSync(disabledPath)) {
+      // Enable: move back to skills
+      if (!fs.existsSync(enabledDir)) fs.mkdirSync(enabledDir, { recursive: true })
+      fs.renameSync(disabledPath, enabledPath)
+    } else {
+      return { ok: false, error: 'Skill not found' }
+    }
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('skills:export', async (_e, skillName: string): Promise<{ ok: boolean; filePath?: string; error?: string }> => {
+  if (!isValidSkillName(skillName)) return { ok: false, error: 'Invalid skill name' }
+  const enabledDir = path.join(os.homedir(), '.copilot', 'skills')
+  const disabledDir = path.join(os.homedir(), '.copilot', 'skills-disabled')
+
+  const srcDir = fs.existsSync(path.join(enabledDir, skillName)) ? path.join(enabledDir, skillName)
+    : fs.existsSync(path.join(disabledDir, skillName)) ? path.join(disabledDir, skillName) : null
+  if (!srcDir) return { ok: false, error: 'Skill not found' }
+
+  if (!win) return { ok: false, error: 'No window available' }
+  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    defaultPath: `${skillName}.zip`,
+    filters: [{ name: 'Zip Archive', extensions: ['zip'] }],
+  })
+  if (canceled || !filePath) return { ok: false, error: 'Export cancelled' }
+
+  try {
+    const { execSync } = require('child_process') as typeof import('child_process')
+    execSync(`cd "${path.dirname(srcDir)}" && zip -r "${filePath}" "${skillName}"`)
+    return { ok: true, filePath }
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('skills:import', async (): Promise<{ ok: boolean; name?: string; error?: string }> => {
+  if (!win) return { ok: false, error: 'No window available' }
+
+  const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    title: 'Import Skill',
+    properties: ['openFile', 'openDirectory'],
+    filters: [{ name: 'Skill files', extensions: ['md'] }],
+  })
+  if (canceled || !filePaths.length) return { ok: false, error: 'Import cancelled' }
+
+  const selected = filePaths[0]
+  const stat = fs.statSync(selected)
+
+  if (stat.isDirectory()) {
+    // Import a folder — must contain SKILL.md
+    const skillMdPath = path.join(selected, 'SKILL.md')
+    if (!fs.existsSync(skillMdPath)) return { ok: false, error: 'Selected folder does not contain a SKILL.md file' }
+
+    const skillName = path.basename(selected).toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '')
+    if (!skillName) return { ok: false, error: 'Could not derive a valid skill name from the folder' }
+
+    const destDir = path.join(os.homedir(), '.copilot', 'skills', skillName)
+    if (fs.existsSync(destDir)) return { ok: false, error: `A skill named "${skillName}" already exists` }
+
+    try {
+      fs.cpSync(selected, destDir, { recursive: true })
+      return { ok: true, name: skillName }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  } else {
+    // Import a single .md file — derive skill name from filename, copy as SKILL.md
+    const baseName = path.basename(selected, path.extname(selected))
+    const skillName = baseName.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '')
+    if (!skillName) return { ok: false, error: 'Could not derive a valid skill name from the filename' }
+
+    const destDir = path.join(os.homedir(), '.copilot', 'skills', skillName)
+    if (fs.existsSync(destDir)) return { ok: false, error: `A skill named "${skillName}" already exists` }
+
+    try {
+      fs.mkdirSync(destDir, { recursive: true })
+      fs.copyFileSync(selected, path.join(destDir, 'SKILL.md'))
+      return { ok: true, name: skillName }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  }
+})
 
 app.whenReady().then(() => {
   // Set macOS dock icon (BrowserWindow icon prop is ignored on macOS)
