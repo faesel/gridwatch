@@ -52,4 +52,8 @@ contextBridge.exposeInMainWorld('gridwatchAPI', {
   exportSkill: (skillName: string) =>
     ipcRenderer.invoke('skills:export', skillName),
   importSkill: () => ipcRenderer.invoke('skills:import'),
+
+  // MCP
+  getMcpServers: () => ipcRenderer.invoke('mcp:get-servers'),
+  showMcpConfig: () => ipcRenderer.invoke('mcp:show-config'),
 })

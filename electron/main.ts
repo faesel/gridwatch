@@ -7,6 +7,7 @@ import fs from 'node:fs'
 import https from 'node:https'
 import type { SessionData, TokenDataPoint, RewindSnapshot, CompactionEvent } from '../src/types/session'
 import type { SkillData, SkillFile } from '../src/types/skill'
+import type { McpServerData, McpEnvVar } from '../src/types/mcp'
 
 // Must be set before app is ready so the OS picks it up for dock/taskbar tooltip
 app.setName('GridWatch')
@@ -1218,4 +1219,118 @@ app.whenReady().then(() => {
     app.dock.setIcon(nativeImage.createFromPath(iconPath))
   }
   createWindow()
+})
+
+// ── MCP IPC ──────────────────────────────────────────────────
+
+const mcpConfigPath = path.join(os.homedir(), '.copilot', 'mcp-config.json')
+
+ipcMain.handle('mcp:get-servers', async (): Promise<McpServerData[]> => {
+  try {
+    const servers: McpServerData[] = []
+
+    // Read local MCP servers from mcp-config.json
+    if (fs.existsSync(mcpConfigPath)) {
+      const raw = fs.readFileSync(mcpConfigPath, 'utf-8')
+      const config = JSON.parse(raw)
+      const mcpServers = config.mcpServers ?? config.servers ?? {}
+
+      for (const [name, def] of Object.entries(mcpServers)) {
+        const d = def as Record<string, unknown>
+        const envObj = (d.env ?? {}) as Record<string, string>
+        const envVars: McpEnvVar[] = Object.entries(envObj).map(([k, v]) => ({
+          name: k,
+          isSecret: /token|secret|key|password/i.test(k) || /^\$\{/.test(v),
+        }))
+
+        servers.push({
+          name,
+          type: 'local',
+          command: (d.command as string) ?? undefined,
+          args: (d.args as string[]) ?? undefined,
+          envVars,
+          tools: [],
+        })
+      }
+    }
+
+    // Scan log files for remote servers, tool names, and connection times
+    const logsDir = path.join(os.homedir(), '.copilot', 'logs')
+    if (fs.existsSync(logsDir)) {
+      const logFiles = fs.readdirSync(logsDir)
+        .filter(f => f.startsWith('process-') && f.endsWith('.log'))
+        .sort().reverse()
+        .slice(0, 5) // scan last 5 log files for broader tool coverage
+
+      const allToolNames = new Set<string>()
+      const connectionTimes = new Map<string, number>()
+      const seenRemote = new Set<string>()
+
+      for (const logFile of logFiles) {
+        const logContent = fs.readFileSync(path.join(logsDir, logFile), 'utf-8')
+
+        // Find remote MCP servers (only from most recent log)
+        if (logFile === logFiles[0]) {
+          const remoteRe = /Starting remote MCP client for (\S+) with url: (\S+)/g
+          let m: RegExpExecArray | null
+          while ((m = remoteRe.exec(logContent)) !== null) {
+            if (!seenRemote.has(m[1])) {
+              seenRemote.add(m[1])
+              servers.push({ name: m[1], type: 'remote', url: m[2], envVars: [], tools: [] })
+            }
+          }
+
+          // Find IDE MCP servers
+          const ideRe = /Connected to IDE MCP server: (.+)/g
+          while ((m = ideRe.exec(logContent)) !== null) {
+            const ideName = `ide-${m[1].split('(')[0].trim().toLowerCase().replace(/\s+/g, '-')}`
+            if (!seenRemote.has(ideName)) {
+              seenRemote.add(ideName)
+              servers.push({ name: ideName, type: 'remote', url: m[1].trim(), envVars: [], tools: [] })
+            }
+          }
+
+          // Connection times
+          const connRe = /MCP client for (\S+) connected, took (\d+)ms/g
+          while ((m = connRe.exec(logContent)) !== null) {
+            connectionTimes.set(m[1], parseInt(m[2], 10))
+          }
+        }
+
+        // Collect all MCP-prefixed tool names across log files
+        const serverNames = servers.map(s => s.name)
+        for (const sName of serverNames) {
+          const escaped = sName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+          const re = new RegExp(escaped + '-[a-zA-Z_]+', 'g')
+          let tm: RegExpExecArray | null
+          while ((tm = re.exec(logContent)) !== null) {
+            allToolNames.add(tm[0])
+          }
+        }
+      }
+
+      // Assign tools and connection times to servers
+      for (const server of servers) {
+        const prefix = server.name + '-'
+        const serverTools = [...allToolNames]
+          .filter(t => t.startsWith(prefix))
+          .map(t => t.slice(prefix.length))
+          .sort()
+        server.tools = serverTools
+        server.toolCount = serverTools.length
+        const ct = connectionTimes.get(server.name)
+        if (ct !== undefined) server.connectionTime = ct
+      }
+    }
+
+    return servers
+  } catch {
+    return []
+  }
+})
+
+ipcMain.handle('mcp:show-config', async () => {
+  if (fs.existsSync(mcpConfigPath)) {
+    shell.showItemInFolder(mcpConfigPath)
+  }
 })

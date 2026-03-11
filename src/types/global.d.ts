@@ -1,5 +1,6 @@
 import type { SessionData } from './session';
 import type { SkillData } from './skill';
+import type { McpServerData } from './mcp';
 
 export interface PromptFeedback {
   prompt: string;
@@ -54,6 +55,10 @@ declare global {
       toggleSkill: (skillName: string) => Promise<{ ok: boolean; error?: string }>;
       exportSkill: (skillName: string) => Promise<{ ok: boolean; filePath?: string; error?: string }>;
       importSkill: () => Promise<{ ok: boolean; name?: string; error?: string }>;
+
+      // MCP
+      getMcpServers: () => Promise<McpServerData[]>;
+      showMcpConfig: () => Promise<void>;
     };
   }
   const __APP_VERSION__: string;

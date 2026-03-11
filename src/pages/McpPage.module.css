@@ -1,0 +1,300 @@
+.container {
+  display: flex;
+  height: 100%;
+  gap: 0;
+}
+
+/* ── List panel ── */
+
+.listPanel {
+  width: 280px;
+  min-width: 280px;
+  border-right: 1px solid var(--tron-border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: var(--density-padding);
+}
+
+.listHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.listTitle {
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  letter-spacing: 2px;
+  color: var(--tron-cyan);
+  font-weight: 700;
+}
+
+.listCount {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  background: rgba(0, 245, 255, 0.08);
+  border: 1px solid var(--tron-border);
+  padding: 1px 7px;
+  border-radius: 3px;
+}
+
+.searchInput {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text);
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  padding: 6px 8px;
+  margin-bottom: 10px;
+  outline: none;
+  font-family: inherit;
+}
+
+.searchInput:focus {
+  border-color: var(--tron-cyan);
+}
+
+.groupLabel {
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  letter-spacing: 2px;
+  color: var(--tron-text-dim);
+  margin: 10px 0 4px;
+  padding-bottom: 3px;
+  border-bottom: 1px solid var(--tron-border);
+}
+
+/* ── Server card ── */
+
+.serverCard {
+  padding: 8px 10px;
+  border: 1px solid var(--tron-border);
+  margin-bottom: 4px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: transparent;
+}
+
+.serverCard:hover {
+  border-color: var(--tron-cyan);
+  background: rgba(0, 245, 255, 0.03);
+}
+
+.serverCardActive {
+  border-color: var(--tron-cyan);
+  background: rgba(0, 245, 255, 0.06);
+  box-shadow: var(--tron-glow-cyan);
+}
+
+.serverName {
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.serverMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.typeBadge {
+  font-size: calc(8 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 1px 5px;
+  border: 1px solid var(--tron-cyan);
+  color: var(--tron-cyan);
+  border-radius: 3px;
+}
+
+.typeBadgeRemote {
+  border-color: var(--tron-blue);
+  color: var(--tron-blue);
+}
+
+.toolCount {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+}
+
+.emptyState {
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  padding: 20px 0;
+  text-align: center;
+}
+
+/* ── Detail panel ── */
+
+.detailPanel {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--density-padding);
+}
+
+.detailHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--tron-border);
+}
+
+.detailTitle {
+  font-size: calc(16 * var(--font-scale, 1) * 1px);
+  color: var(--tron-cyan);
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.section {
+  margin-bottom: calc(var(--density-padding) + 6px);
+}
+
+.sectionTitle {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 2px;
+  color: var(--tron-text-dim);
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--tron-border);
+  padding-bottom: 4px;
+}
+
+.fieldRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(26, 42, 74, 0.4);
+}
+
+.fieldLabel {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  letter-spacing: 0.5px;
+  min-width: 100px;
+  flex-shrink: 0;
+}
+
+.fieldValue {
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text);
+  word-break: break-all;
+}
+
+.fieldSecret {
+  color: var(--tron-orange);
+  letter-spacing: 2px;
+}
+
+.showFileBtn {
+  background: none;
+  border: 1px solid var(--tron-border);
+  color: var(--tron-cyan);
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  padding: 6px 12px;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 0.5px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.showFileBtn:hover {
+  border-color: var(--tron-cyan);
+  background: rgba(0, 245, 255, 0.06);
+}
+
+/* ── Tool catalogue ── */
+
+.toolGroup {
+  border: 1px solid var(--tron-border);
+  margin-bottom: 4px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.toolGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.toolGroupHeader:hover {
+  background: rgba(0, 245, 255, 0.04);
+}
+
+.toolGroupChevron {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  color: var(--tron-cyan);
+  width: 10px;
+}
+
+.toolGroupName {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1.5px;
+  color: var(--tron-text);
+  font-weight: 700;
+  flex: 1;
+}
+
+.toolGroupCount {
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  background: rgba(0, 245, 255, 0.06);
+  border: 1px solid var(--tron-border);
+  padding: 0 5px;
+  border-radius: 3px;
+}
+
+.toolList {
+  padding: 0 10px 8px 28px;
+}
+
+.toolItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.toolDot {
+  color: var(--tron-text-dim);
+  font-size: calc(14 * var(--font-scale, 1) * 1px);
+  line-height: 1;
+}
+
+.toolName {
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text);
+}
+
+/* ── Empty detail state ── */
+
+.emptyDetail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--tron-text-dim);
+}
+
+.emptyIcon {
+  font-size: 40px;
+  margin-bottom: 12px;
+  opacity: 0.3;
+}
+
+.emptyLabel {
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+}
