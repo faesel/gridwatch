@@ -48,6 +48,9 @@ GridWatch reads the local session data written by [GitHub Copilot CLI](https://g
 ### Skills
 ![Skills](public/images/screenshot-skills.png)
 
+### MCP
+![Skills](public/images/screenshot-mcp.png)
+
 ### Activity
 ![Activity](public/images/screenshot-activity.png)
 
