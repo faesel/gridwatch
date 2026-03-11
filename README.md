@@ -27,6 +27,7 @@ GridWatch reads the local session data written by [GitHub Copilot CLI](https://g
 - ⚡ **AI Insights** — analyse your sessions with OpenAI to get prompt quality scores and improvement suggestions
 - 🏷️ **Tagging** — add, remove, and filter sessions by custom tags
 - ✦ **Skills management** — browse, create, edit, duplicate, delete, and search your Copilot CLI skills (`~/.copilot/skills/`). View rendered markdown with Tron-themed styling, toggle skills on/off, rename folders, import from files or folders, and export as zip archives
+- ◈ **MCP server dashboard** — view all installed Model Context Protocol servers (local stdio and remote HTTP), browse their full tool catalogues grouped by category, see environment variables (with secret masking), connection times, and command details
 - ✏️ **Rename sessions** — give sessions a meaningful name beyond the auto-generated summary
 - 🗑️ **Archive / Delete** — safely archive or permanently remove old sessions (guards against deleting active sessions)
 - 📂 **Open in folder** — reveal research reports and modified files in Finder (macOS) or Explorer (Windows)
@@ -48,8 +49,8 @@ GridWatch reads the local session data written by [GitHub Copilot CLI](https://g
 ### Skills
 ![Skills](public/images/screenshot-skills.png)
 
-### MCP
-![Skills](public/images/screenshot-mcp.png)
+### MCP Servers
+![MCP Servers](public/images/screenshot-mcp.png)
 
 ### Activity
 ![Activity](public/images/screenshot-activity.png)
@@ -132,12 +133,14 @@ gridwatch/
 │   │   ├── TokensPage.tsx      # Token usage charts
 │   │   ├── ActivityPage.tsx    # Heatmap + activity analytics
 │   │   ├── SkillsPage.tsx      # Copilot skills browser and editor
+│   │   ├── McpPage.tsx         # MCP server dashboard + tool catalogue
 │   │   ├── InsightsPage.tsx    # AI-powered prompt feedback
 │   │   ├── TransferPage.tsx    # Session context transfer
 │   │   └── SettingsPage.tsx    # UI scale / font / density controls
 │   ├── types/
 │   │   ├── session.ts          # SessionData and related interfaces
 │   │   ├── skill.ts            # SkillData and SkillFile interfaces
+│   │   ├── mcp.ts              # McpServerData and McpEnvVar interfaces
 │   │   └── global.d.ts         # Window.gridwatchAPI type declarations
 │   ├── App.tsx                 # Shell layout, sidebar nav, auto-refresh
 │   └── index.css               # Global styles + Tron design system variables
@@ -174,6 +177,8 @@ GridWatch reads exclusively from local files — no network requests are made ex
 | Archived sessions | `~/.copilot/session-state-archived/<uuid>/` (moved here by GridWatch archive) |
 | Session tags / custom data | `~/.copilot/session-state/<uuid>/gridwatch.json` (written by GridWatch) |
 | Copilot skills | `~/.copilot/skills/<name>/SKILL.md` (read/write for skill management) |
+| MCP server config | `~/.copilot/mcp-config.json` (local MCP server definitions, read-only) |
+| MCP tool discovery | `~/.copilot/logs/process-*.log` (tool names and connection times parsed from logs) |
 | Disabled skills | `~/.copilot/skills-disabled/<name>/` (moved here when toggled off) |
 | Encrypted API token | `~/.copilot/gridwatch-token.enc` (encrypted via OS keychain) |
 | Update check | `api.github.com/repos/faesel/gridwatch/releases/latest` (on startup only) |
