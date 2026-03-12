@@ -1224,34 +1224,49 @@ app.whenReady().then(() => {
 // ── MCP IPC ──────────────────────────────────────────────────
 
 const mcpConfigPath = path.join(os.homedir(), '.copilot', 'mcp-config.json')
+const mcpDisabledPath = path.join(os.homedir(), '.copilot', 'gridwatch-mcp-disabled.json')
+
+function parseMcpEntry(name: string, def: unknown, enabled: boolean): McpServerData {
+  const d = def as Record<string, unknown>
+  const envObj = (d.env ?? {}) as Record<string, string>
+  const envVars: McpEnvVar[] = Object.entries(envObj).map(([k, v]) => ({
+    name: k,
+    isSecret: /token|secret|key|password/i.test(k) || /^\$\{/.test(v),
+  }))
+  return {
+    name,
+    type: 'local',
+    command: (d.command as string) ?? undefined,
+    args: (d.args as string[]) ?? undefined,
+    envVars,
+    tools: [],
+    enabled,
+  }
+}
 
 ipcMain.handle('mcp:get-servers', async (): Promise<McpServerData[]> => {
   try {
     const servers: McpServerData[] = []
 
-    // Read local MCP servers from mcp-config.json
+    // Read enabled local MCP servers from mcp-config.json
     if (fs.existsSync(mcpConfigPath)) {
       const raw = fs.readFileSync(mcpConfigPath, 'utf-8')
       const config = JSON.parse(raw)
       const mcpServers = config.mcpServers ?? config.servers ?? {}
-
       for (const [name, def] of Object.entries(mcpServers)) {
-        const d = def as Record<string, unknown>
-        const envObj = (d.env ?? {}) as Record<string, string>
-        const envVars: McpEnvVar[] = Object.entries(envObj).map(([k, v]) => ({
-          name: k,
-          isSecret: /token|secret|key|password/i.test(k) || /^\$\{/.test(v),
-        }))
-
-        servers.push({
-          name,
-          type: 'local',
-          command: (d.command as string) ?? undefined,
-          args: (d.args as string[]) ?? undefined,
-          envVars,
-          tools: [],
-        })
+        servers.push(parseMcpEntry(name, def, true))
       }
+    }
+
+    // Read disabled local MCP servers from gridwatch-mcp-disabled.json
+    if (fs.existsSync(mcpDisabledPath)) {
+      try {
+        const raw = fs.readFileSync(mcpDisabledPath, 'utf-8')
+        const disabled = JSON.parse(raw) as Record<string, unknown>
+        for (const [name, def] of Object.entries(disabled)) {
+          servers.push(parseMcpEntry(name, def, false))
+        }
+      } catch { /* ignore malformed disabled file */ }
     }
 
     // Scan log files for remote servers, tool names, and connection times
@@ -1276,7 +1291,7 @@ ipcMain.handle('mcp:get-servers', async (): Promise<McpServerData[]> => {
           while ((m = remoteRe.exec(logContent)) !== null) {
             if (!seenRemote.has(m[1])) {
               seenRemote.add(m[1])
-              servers.push({ name: m[1], type: 'remote', url: m[2], envVars: [], tools: [] })
+              servers.push({ name: m[1], type: 'remote', url: m[2], envVars: [], tools: [], enabled: true })
             }
           }
 
@@ -1286,7 +1301,7 @@ ipcMain.handle('mcp:get-servers', async (): Promise<McpServerData[]> => {
             const ideName = `ide-${m[1].split('(')[0].trim().toLowerCase().replace(/\s+/g, '-')}`
             if (!seenRemote.has(ideName)) {
               seenRemote.add(ideName)
-              servers.push({ name: ideName, type: 'remote', url: m[1].trim(), envVars: [], tools: [] })
+              servers.push({ name: ideName, type: 'remote', url: m[1].trim(), envVars: [], tools: [], enabled: true })
             }
           }
 
@@ -1332,5 +1347,45 @@ ipcMain.handle('mcp:get-servers', async (): Promise<McpServerData[]> => {
 ipcMain.handle('mcp:show-config', async () => {
   if (fs.existsSync(mcpConfigPath)) {
     shell.showItemInFolder(mcpConfigPath)
+  }
+})
+
+ipcMain.handle('mcp:toggle-server', async (_e, serverName: string): Promise<{ ok: boolean; enabled: boolean; error?: string }> => {
+  try {
+    // Read current config
+    const configRaw = fs.existsSync(mcpConfigPath) ? fs.readFileSync(mcpConfigPath, 'utf-8') : '{}'
+    const config = JSON.parse(configRaw)
+    const configKey = config.mcpServers ? 'mcpServers' : 'servers'
+    const mcpServers: Record<string, unknown> = config[configKey] ?? {}
+
+    // Read disabled store
+    const disabledRaw = fs.existsSync(mcpDisabledPath) ? fs.readFileSync(mcpDisabledPath, 'utf-8') : '{}'
+    const disabled: Record<string, unknown> = JSON.parse(disabledRaw)
+
+    if (serverName in mcpServers) {
+      // Disable: move from config to disabled store
+      disabled[serverName] = mcpServers[serverName]
+      delete mcpServers[serverName]
+      config[configKey] = mcpServers
+      fs.writeFileSync(mcpConfigPath, JSON.stringify(config, null, 2) + '\n', 'utf-8')
+      fs.writeFileSync(mcpDisabledPath, JSON.stringify(disabled, null, 2) + '\n', 'utf-8')
+      return { ok: true, enabled: false }
+    } else if (serverName in disabled) {
+      // Enable: move from disabled store back to config
+      mcpServers[serverName] = disabled[serverName]
+      delete disabled[serverName]
+      config[configKey] = mcpServers
+      fs.writeFileSync(mcpConfigPath, JSON.stringify(config, null, 2) + '\n', 'utf-8')
+      if (Object.keys(disabled).length === 0) {
+        if (fs.existsSync(mcpDisabledPath)) fs.unlinkSync(mcpDisabledPath)
+      } else {
+        fs.writeFileSync(mcpDisabledPath, JSON.stringify(disabled, null, 2) + '\n', 'utf-8')
+      }
+      return { ok: true, enabled: true }
+    }
+
+    return { ok: false, enabled: false, error: 'Server not found' }
+  } catch (err) {
+    return { ok: false, enabled: false, error: (err as Error).message }
   }
 })

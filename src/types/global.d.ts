@@ -59,6 +59,7 @@ declare global {
       // MCP
       getMcpServers: () => Promise<McpServerData[]>;
       showMcpConfig: () => Promise<void>;
+      toggleMcpServer: (serverName: string) => Promise<{ ok: boolean; enabled: boolean; error?: string }>;
     };
   }
   const __APP_VERSION__: string;

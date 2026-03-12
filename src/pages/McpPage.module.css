@@ -86,6 +86,14 @@
   box-shadow: var(--tron-glow-cyan);
 }
 
+.serverCardDisabled {
+  opacity: 0.5;
+}
+
+.serverCardDisabled .serverName {
+  color: var(--tron-text-dim);
+}
+
 .serverName {
   font-size: calc(12 * var(--font-scale, 1) * 1px);
   color: var(--tron-text);
@@ -189,22 +197,6 @@
   letter-spacing: 2px;
 }
 
-.showFileBtn {
-  background: none;
-  border: 1px solid var(--tron-border);
-  color: var(--tron-cyan);
-  font-size: calc(11 * var(--font-scale, 1) * 1px);
-  padding: 6px 12px;
-  cursor: pointer;
-  font-family: inherit;
-  letter-spacing: 0.5px;
-  transition: border-color 0.15s, background 0.15s;
-}
-
-.showFileBtn:hover {
-  border-color: var(--tron-cyan);
-  background: rgba(0, 245, 255, 0.06);
-}
 
 /* ── Tool catalogue ── */
 
@@ -298,3 +290,82 @@
   font-size: calc(12 * var(--font-scale, 1) * 1px);
   letter-spacing: 1px;
 }
+
+/* ── Action bar ── */
+
+.actionBar {
+  display: flex;
+  gap: 6px;
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--tron-border);
+  flex-wrap: wrap;
+}
+
+.actionBtn {
+  background: var(--tron-panel);
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text);
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.actionBtn:hover {
+  border-color: var(--tron-cyan);
+  color: var(--tron-cyan);
+}
+
+.toggleActionBtn {
+  background: var(--tron-panel);
+  border: 1px solid var(--tron-border);
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.toggleActionBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.toggleActionEnabled {
+  border-color: var(--tron-cyan);
+  color: var(--tron-cyan);
+}
+
+.toggleActionDisabled {
+  border-color: var(--tron-orange);
+  color: var(--tron-orange);
+}
+
+/* ── Disabled badge ── */
+
+.disabledBadge {
+  font-size: calc(8 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 1px 5px;
+  border: 1px solid var(--tron-orange);
+  color: var(--tron-orange);
+  border-radius: 3px;
+}
+
+/* ── Notice banner ── */
+
+.noticeBanner {
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  padding: 5px 8px;
+  margin-bottom: 8px;
+  border-left: 2px solid var(--tron-orange);
+  background: rgba(255, 102, 0, 0.04);
+  letter-spacing: 0.3px;
+}
+
+

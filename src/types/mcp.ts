@@ -13,4 +13,5 @@ export interface McpServerData {
   toolCount?: number
   tools: string[]
   connectionTime?: number
+  enabled: boolean
 }

@@ -26,6 +26,7 @@ export default function McpPage({ refreshKey }: { refreshKey?: number }) {
   const [search, setSearch] = useState('')
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [toolSearch, setToolSearch] = useState('')
+  const [toggling, setToggling] = useState<string | null>(null)
 
   const loadServers = useCallback(async () => {
     try {
@@ -33,6 +34,16 @@ export default function McpPage({ refreshKey }: { refreshKey?: number }) {
       setServers(data)
     } catch { /* ignore */ }
   }, [])
+
+  const handleToggle = useCallback(async (serverName: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    setToggling(serverName)
+    try {
+      const result = await window.gridwatchAPI.toggleMcpServer(serverName)
+      if (result.ok) await loadServers()
+    } catch { /* ignore */ }
+    setToggling(null)
+  }, [loadServers])
 
   useEffect(() => {
     loadServers()
@@ -91,19 +102,24 @@ export default function McpPage({ refreshKey }: { refreshKey?: number }) {
           onChange={e => setSearch(e.target.value)}
         />
 
+        <div className={styles.noticeBanner}>
+          ⚡ Changes take effect in new sessions
+        </div>
+
         {localServers.length > 0 && (
           <>
             <div className={styles.groupLabel}>LOCAL</div>
             {localServers.map(s => (
               <div
                 key={s.name}
-                className={`${styles.serverCard} ${selected?.name === s.name ? styles.serverCardActive : ''}`}
+                className={`${styles.serverCard} ${selected?.name === s.name ? styles.serverCardActive : ''} ${!s.enabled ? styles.serverCardDisabled : ''}`}
                 onClick={() => setSelected(s)}
               >
                 <div className={styles.serverName}>{s.name}</div>
                 <div className={styles.serverMeta}>
                   <span className={styles.typeBadge}>LOCAL</span>
-                  {s.toolCount !== undefined && (
+                  {!s.enabled && <span className={styles.disabledBadge}>DISABLED</span>}
+                  {s.toolCount !== undefined && s.toolCount > 0 && (
                     <span className={styles.toolCount}>{s.toolCount} tools</span>
                   )}
                 </div>
@@ -149,7 +165,26 @@ export default function McpPage({ refreshKey }: { refreshKey?: number }) {
               <span className={`${styles.typeBadge} ${selected.type === 'remote' ? styles.typeBadgeRemote : ''}`}>
                 {selected.type.toUpperCase()}
               </span>
+              {!selected.enabled && <span className={styles.disabledBadge}>DISABLED</span>}
             </div>
+
+            {selected.type === 'local' && (
+              <div className={styles.actionBar}>
+                <button
+                  className={`${styles.toggleActionBtn} ${selected.enabled ? styles.toggleActionEnabled : styles.toggleActionDisabled}`}
+                  disabled={toggling === selected.name}
+                  onClick={(e) => handleToggle(selected.name, e)}
+                >
+                  {selected.enabled ? '● ENABLED' : '○ DISABLED'}
+                </button>
+                <button
+                  className={styles.actionBtn}
+                  onClick={() => window.gridwatchAPI.showMcpConfig()}
+                >
+                  ◈ CONFIG FILE
+                </button>
+              </div>
+            )}
 
             <div className={styles.section}>
               <div className={styles.sectionTitle}>CONNECTION</div>
@@ -249,16 +284,6 @@ export default function McpPage({ refreshKey }: { refreshKey?: number }) {
                 )}
               </div>
             )}
-
-            <div className={styles.section}>
-              <div className={styles.sectionTitle}>CONFIGURATION FILE</div>
-              <button
-                className={styles.showFileBtn}
-                onClick={() => window.gridwatchAPI.showMcpConfig()}
-              >
-                ◈ Open mcp-config.json
-              </button>
-            </div>
           </>
         ) : (
           <div className={styles.emptyDetail}>

@@ -56,4 +56,6 @@ contextBridge.exposeInMainWorld('gridwatchAPI', {
   // MCP
   getMcpServers: () => ipcRenderer.invoke('mcp:get-servers'),
   showMcpConfig: () => ipcRenderer.invoke('mcp:show-config'),
+  toggleMcpServer: (serverName: string) =>
+    ipcRenderer.invoke('mcp:toggle-server', serverName),
 })
