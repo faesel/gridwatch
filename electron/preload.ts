@@ -52,6 +52,8 @@ contextBridge.exposeInMainWorld('gridwatchAPI', {
   exportSkill: (skillName: string) =>
     ipcRenderer.invoke('skills:export', skillName),
   importSkill: () => ipcRenderer.invoke('skills:import'),
+  setSkillTags: (skillName: string, tags: string[]) =>
+    ipcRenderer.invoke('skills:set-tags', skillName, tags),
 
   // MCP
   getMcpServers: () => ipcRenderer.invoke('mcp:get-servers'),

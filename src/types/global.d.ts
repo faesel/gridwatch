@@ -55,6 +55,7 @@ declare global {
       toggleSkill: (skillName: string) => Promise<{ ok: boolean; error?: string }>;
       exportSkill: (skillName: string) => Promise<{ ok: boolean; filePath?: string; error?: string }>;
       importSkill: () => Promise<{ ok: boolean; name?: string; error?: string }>;
+      setSkillTags: (skillName: string, tags: string[]) => Promise<boolean>;
 
       // MCP
       getMcpServers: () => Promise<McpServerData[]>;

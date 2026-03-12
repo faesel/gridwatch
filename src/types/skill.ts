@@ -16,4 +16,5 @@ export interface SkillData {
   modifiedAt: string;
   usageCount?: number;
   lastUsed?: string;
+  tags: string[];
 }

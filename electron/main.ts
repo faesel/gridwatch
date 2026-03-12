@@ -264,12 +264,14 @@ ipcMain.handle('sessions:get-all', async (): Promise<SessionData[]> => {
         let copilotVersion: string | undefined
         let lastUserMessage: string | undefined
         const userMessages: { content: string; model?: string; timestamp?: string }[] = []
+        let hasCodeReviewAgent = false
 
         const eventsFile = path.join(sessionDir, 'events.jsonl')
         if (fs.existsSync(eventsFile)) {
           const eventsContent = fs.readFileSync(eventsFile, 'utf-8')
           const allEvents: { type: string; data?: Record<string, unknown>; timestamp?: string }[] = []
           for (const line of eventsContent.split('\n')) {
+            if (line.includes('"agent_type":"code-review"')) hasCodeReviewAgent = true
             if (!line.includes('session.start') && !line.includes('user.message') && !line.includes('tool.execution_start') && !line.includes('tool.execution_complete')) continue
             try {
               allEvents.push(JSON.parse(line))
@@ -360,6 +362,9 @@ ipcMain.handle('sessions:get-all', async (): Promise<SessionData[]> => {
         const firstUserMsg = userMessages[0]?.content ?? ''
         const isResearch = firstUserMsg.startsWith('Researching: ')
 
+        // Detect review sessions (code-review agent used)
+        const isReview = hasCodeReviewAgent
+
         resolve({
           id: workspace.id || entry,
           cwd: workspace.cwd || '',
@@ -402,6 +407,7 @@ ipcMain.handle('sessions:get-all', async (): Promise<SessionData[]> => {
           tokenHistory,
           compactions,
           isResearch,
+          isReview,
           researchReports: (() => {
             try {
               const researchDir = path.join(sessionDir, 'research')
@@ -963,6 +969,15 @@ function scanSkillDir(dirPath: string, enabled: boolean): SkillData | null {
     }
   } catch { /* skip unreadable */ }
 
+  let tags: string[] = []
+  try {
+    const metaFile = path.join(dirPath, 'gridwatch.json')
+    if (fs.existsSync(metaFile)) {
+      const meta = JSON.parse(fs.readFileSync(metaFile, 'utf-8'))
+      if (Array.isArray(meta.tags)) tags = meta.tags
+    }
+  } catch { /* ignore */ }
+
   return {
     name: skillName,
     displayName: frontmatter.displayName,
@@ -972,6 +987,7 @@ function scanSkillDir(dirPath: string, enabled: boolean): SkillData | null {
     enabled,
     createdAt: new Date(earliestBirth).toISOString(),
     modifiedAt: latestMtime ? new Date(latestMtime).toISOString() : new Date().toISOString(),
+    tags,
   }
 }
 
@@ -1109,6 +1125,27 @@ ipcMain.handle('skills:duplicate', async (_e, skillName: string, newName: string
     return { ok: true }
   } catch (err) {
     return { ok: false, error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('skills:set-tags', async (_e, skillName: string, tags: string[]): Promise<boolean> => {
+  try {
+    if (!isValidSkillName(skillName)) return false
+    if (!Array.isArray(tags)) return false
+    const enabledDir = path.join(os.homedir(), '.copilot', 'skills')
+    const disabledDir = path.join(os.homedir(), '.copilot', 'skills-disabled')
+    const skillDir = fs.existsSync(path.join(enabledDir, skillName)) ? path.join(enabledDir, skillName)
+      : fs.existsSync(path.join(disabledDir, skillName)) ? path.join(disabledDir, skillName) : null
+    if (!skillDir) return false
+    const metaFile = path.join(skillDir, 'gridwatch.json')
+    let existing: Record<string, unknown> = {}
+    if (fs.existsSync(metaFile)) {
+      try { existing = JSON.parse(fs.readFileSync(metaFile, 'utf-8')) } catch { /* ignore */ }
+    }
+    fs.writeFileSync(metaFile, JSON.stringify({ ...existing, tags }, null, 2), 'utf-8')
+    return true
+  } catch {
+    return false
   }
 })
 

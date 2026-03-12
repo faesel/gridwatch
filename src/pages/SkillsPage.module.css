@@ -562,3 +562,174 @@
 .usageStat {
   color: var(--tron-blue);
 }
+
+/* ── Tag filter (list column) ────────────────── */
+.tagFilterToggle {
+  background: none;
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text-dim);
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 4px 10px;
+  margin: 0 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  width: calc(100% - 24px);
+  text-align: left;
+}
+
+.tagFilterToggle:hover {
+  border-color: var(--tron-cyan);
+  color: var(--tron-cyan);
+}
+
+.tagFilterActive {
+  border-color: var(--tron-orange);
+  color: var(--tron-orange);
+}
+
+.tagFilterPanel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--tron-border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.tagFilterChip {
+  background: rgba(0, 245, 255, 0.05);
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text-dim);
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border-radius: 2px;
+}
+
+.tagFilterChip:hover {
+  border-color: var(--tron-cyan);
+  color: var(--tron-cyan);
+}
+
+.tagFilterChipSelected {
+  background: rgba(0, 245, 255, 0.15);
+  border-color: var(--tron-cyan);
+  color: var(--tron-cyan);
+  text-shadow: var(--tron-glow-cyan);
+}
+
+.tagFilterClear {
+  background: none;
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text-dim);
+  font-family: inherit;
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-left: auto;
+}
+
+.tagFilterClear:hover {
+  border-color: var(--tron-orange);
+  color: var(--tron-orange);
+}
+
+/* ── Tags (list card) ────────────────────────── */
+.cardTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.tagChip {
+  background: rgba(0, 245, 255, 0.1);
+  border: 1px solid rgba(0, 245, 255, 0.3);
+  color: var(--tron-cyan);
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+/* ── Tags (detail panel) ────────────────────── */
+.tagsSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--tron-border);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.tagsSectionLabel {
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  letter-spacing: 1.5px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.tagsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.tagChipDetail {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 245, 255, 0.1);
+  border: 1px solid rgba(0, 245, 255, 0.35);
+  color: var(--tron-cyan);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 3px 8px;
+  border-radius: 2px;
+}
+
+.tagRemove {
+  background: none;
+  border: none;
+  color: rgba(0, 245, 255, 0.5);
+  cursor: pointer;
+  font-size: calc(13 * var(--font-scale, 1) * 1px);
+  line-height: 1;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.tagRemove:hover {
+  color: var(--tron-orange);
+}
+
+.tagInput {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(0, 245, 255, 0.2);
+  color: var(--tron-text);
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  outline: none;
+  padding: 2px 4px;
+  width: 100px;
+}
+
+.tagInput::placeholder {
+  color: var(--tron-text-dim);
+}
+
+.tagInput:focus {
+  border-bottom-color: var(--tron-cyan);
+}

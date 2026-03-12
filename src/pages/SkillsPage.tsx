@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { marked } from 'marked'
 import type { SkillData } from '../types/skill'
 import styles from './SkillsPage.module.css'
@@ -25,6 +25,12 @@ export default function SkillsPage({ refreshKey }: { refreshKey?: number }) {
   const [dialogDesc, setDialogDesc] = useState('')
   const [dialogError, setDialogError] = useState('')
   const editorRef = useRef<HTMLTextAreaElement>(null)
+
+  // Tag state
+  const [localTags, setLocalTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
+  const [showTagFilter, setShowTagFilter] = useState(false)
 
   const loadSkills = useCallback(async () => {
     try {
@@ -65,10 +71,57 @@ export default function SkillsPage({ refreshKey }: { refreshKey?: number }) {
     }
   }, [skills])
 
+  // Sync local tags when selected skill changes
+  useEffect(() => {
+    setLocalTags(selected?.tags ?? [])
+    setTagInput('')
+  }, [selected?.name])
+
+  const addTag = async (tag: string) => {
+    const trimmed = tag.trim().toLowerCase().replace(/\s+/g, '-')
+    if (!trimmed || !selected || localTags.includes(trimmed)) return
+    const next = [...localTags, trimmed]
+    setLocalTags(next)
+    await window.gridwatchAPI.setSkillTags(selected.name, next)
+    loadSkills()
+  }
+
+  const removeTag = async (tag: string) => {
+    if (!selected) return
+    const next = localTags.filter((t) => t !== tag)
+    setLocalTags(next)
+    await window.gridwatchAPI.setSkillTags(selected.name, next)
+    loadSkills()
+  }
+
+  const allTags = useMemo(() => Array.from(
+    new Set(skills.flatMap((s) => s.tags ?? []))
+  ).sort(), [skills])
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags((prev) => {
+      const next = new Set(prev)
+      if (next.has(tag)) next.delete(tag)
+      else next.add(tag)
+      return next
+    })
+  }
+
+  const clearTagFilter = () => setSelectedTags(new Set())
+
   const filtered = skills.filter((s) => {
+    if (selectedTags.size > 0) {
+      const skillTags = s.tags ?? []
+      for (const tag of selectedTags) {
+        if (!skillTags.includes(tag)) return false
+      }
+    }
     if (!search) return true
     const q = search.toLowerCase()
-    return s.displayName.toLowerCase().includes(q) || s.description.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)
+    return s.displayName.toLowerCase().includes(q)
+      || s.description.toLowerCase().includes(q)
+      || s.name.toLowerCase().includes(q)
+      || (s.tags ?? []).some((t) => t.toLowerCase().includes(q))
   })
 
   const handleSelectSkill = (skill: SkillData) => {
@@ -241,6 +294,33 @@ export default function SkillsPage({ refreshKey }: { refreshKey?: number }) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        {allTags.length > 0 && (
+          <button
+            className={`${styles.tagFilterToggle} ${selectedTags.size > 0 ? styles.tagFilterActive : ''}`}
+            onClick={() => setShowTagFilter(!showTagFilter)}
+          >
+            {selectedTags.size > 0 ? `▼ TAGS (${selectedTags.size})` : '▶ FILTER BY TAG'}
+          </button>
+        )}
+        {showTagFilter && allTags.length > 0 && (
+          <div className={styles.tagFilterPanel}>
+            {allTags.map((tag) => (
+              <button
+                key={tag}
+                className={`${styles.tagFilterChip} ${selectedTags.has(tag) ? styles.tagFilterChipSelected : ''}`}
+                onClick={() => toggleTag(tag)}
+                aria-pressed={selectedTags.has(tag)}
+              >
+                {selectedTags.has(tag) ? '☑ ' : '☐ '}{tag}
+              </button>
+            ))}
+            {selectedTags.size > 0 && (
+              <button className={styles.tagFilterClear} onClick={clearTagFilter}>
+                CLEAR
+              </button>
+            )}
+          </div>
+        )}
         <div className={styles.list}>
           {filtered.length === 0 && (
             <div className={styles.emptyState}>
@@ -266,6 +346,13 @@ export default function SkillsPage({ refreshKey }: { refreshKey?: number }) {
                   <span className={styles.usageStat}>{skill.usageCount} use{skill.usageCount !== 1 ? 's' : ''}</span>
                 )}
               </div>
+              {(skill.tags ?? []).length > 0 && (
+                <div className={styles.cardTags}>
+                  {skill.tags.map((t) => (
+                    <span key={t} className={styles.tagChip}>{t}</span>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -290,6 +377,35 @@ export default function SkillsPage({ refreshKey }: { refreshKey?: number }) {
             <span className={styles.folderLabel}>FOLDER</span>
             <span className={styles.folderValue}>{selected.name}</span>
             <button className={styles.folderRenameBtn} onClick={openRenameFolderDialog} title="Rename folder">✎</button>
+          </div>
+
+          <div className={styles.tagsSection}>
+            <span className={styles.tagsSectionLabel}>TAGS</span>
+            <div className={styles.tagsRow}>
+              {localTags.map((t) => (
+                <span key={t} className={styles.tagChipDetail}>
+                  {t}
+                  <button
+                    className={styles.tagRemove}
+                    onClick={() => removeTag(t)}
+                    aria-label={`Remove tag ${t}`}
+                  >×</button>
+                </span>
+              ))}
+              <input
+                className={styles.tagInput}
+                placeholder="+ add tag"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ',') {
+                    e.preventDefault()
+                    addTag(tagInput)
+                    setTagInput('')
+                  }
+                }}
+              />
+            </div>
           </div>
 
           {actionError && (

@@ -63,7 +63,7 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
   const [search, setSearch] = useState('')
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
   const [showTagFilter, setShowTagFilter] = useState(false)
-  const [typeFilter, setTypeFilter] = useState<'all' | 'research' | 'coding'>('all')
+  const [typeFilter, setTypeFilter] = useState<'all' | 'research' | 'review' | 'coding'>('all')
   const [page, setPage] = useState(0)
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState('')
@@ -239,7 +239,8 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
   const filtered = useMemo(() => sessions.filter((s) => {
     // Type filter
     if (typeFilter === 'research' && !s.isResearch) return false
-    if (typeFilter === 'coding' && s.isResearch) return false
+    if (typeFilter === 'review' && !s.isReview) return false
+    if (typeFilter === 'coding' && (s.isResearch || s.isReview)) return false
     // Tag filter: session must have ALL selected tags
     if (selectedTags.size > 0) {
       const sessionTags = s.tags ?? []
@@ -303,7 +304,7 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
             </button>
           )}
           <div className={styles.typeFilter}>
-            {(['all', 'research', 'coding'] as const).map((t) => (
+            {(['all', 'research', 'review', 'coding'] as const).map((t) => (
               <button
                 key={t}
                 className={`${styles.typeFilterBtn} ${typeFilter === t ? styles.typeFilterBtnActive : ''}`}
@@ -384,6 +385,9 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
                   {session.isResearch && (
                     <span className={styles.researchBadge}>RESEARCH</span>
                   )}
+                  {session.isReview && (
+                    <span className={styles.reviewBadge}>REVIEW</span>
+                  )}
                 </div>
                 {(session.tags ?? []).length > 0 && (
                   <div className={styles.cardTags}>
@@ -441,6 +445,9 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
                   {selectedSession.summary || 'SESSION DETAIL'}
                   {selectedSession.isResearch && (
                     <span className={styles.researchBadgeDetail}>RESEARCH</span>
+                  )}
+                  {selectedSession.isReview && (
+                    <span className={styles.reviewBadgeDetail}>REVIEW</span>
                   )}
                 </div>
                 <div className={styles.detailActions}>

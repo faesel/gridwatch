@@ -1025,6 +1025,26 @@
   vertical-align: middle;
 }
 
+.reviewBadge {
+  font-size: calc(8 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 1px 5px;
+  border: 1px solid #b266ff;
+  color: #b266ff;
+  border-radius: 2px;
+}
+
+.reviewBadgeDetail {
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 2px 7px;
+  margin-left: 8px;
+  border: 1px solid #b266ff;
+  color: #b266ff;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
 /* ── Compaction list ─────────────────────────────── */
 .cardCompactions {
   color: var(--tron-text-dim);
