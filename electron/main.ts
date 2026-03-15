@@ -244,9 +244,6 @@ function buildContextCost(
 ): { items: ContextCostItem[]; totalTokens: number } {
   const items: ContextCostItem[] = []
 
-  // System prompt (baseline estimate)
-  items.push({ label: 'System prompt', tokens: 2000 })
-
   // Instruction files — check gitRoot (or cwd) for .github/copilot-instructions.md
   if (projectRoot) {
     const instructionPath = path.join(projectRoot, '.github', 'copilot-instructions.md')
