@@ -123,7 +123,7 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
   useEffect(() => {
     if (selectedSession) {
       const updated = sessions.find(s => s.id === selectedSession.id)
-      if (updated && updated !== selectedSession) setSelectedSession(updated)
+      if (updated && updated.updatedAt !== selectedSession.updatedAt) setSelectedSession(updated)
     }
   }, [sessions])
 
