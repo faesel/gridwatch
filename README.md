@@ -228,6 +228,8 @@ The Tron-inspired colour palette is defined as CSS custom properties in `src/ind
 
 Releases are built and published automatically by GitHub Actions when a version tag is pushed.
 
+> **⚠️ Important:** The version in `package.json` determines the artifact filenames (e.g. `GridWatch-Mac-0.22.0-arm64.dmg`). Always bump the version in `package.json` **before** creating the git tag, otherwise the release will produce artifacts with the old version number.
+
 ```bash
 # 1. Bump the version (choose one)
 npm version patch --no-git-tag-version   # 0.5.4 → 0.5.5  (bug fixes)
@@ -249,6 +251,16 @@ The release workflow will:
 2. Build a `.dmg` for macOS (arm64 + x64) in parallel
 3. Build an `.exe` NSIS installer for Windows (x64) in parallel
 4. Upload both artifacts to the release
+
+**If you forget to bump first**, you can fix it by bumping the version, committing, then force-updating the tag:
+```bash
+npm version <correct-version> --no-git-tag-version
+git add package.json package-lock.json
+git commit -m "chore: bump version to <correct-version>"
+git push origin main
+git tag -f v<correct-version>
+git push origin v<correct-version> --force
+```
 
 > **Note:** The macOS build is currently unsigned. See the [installation section](#macos-app-cannot-be-verified-warning) for the Gatekeeper workaround.
 
