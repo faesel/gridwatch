@@ -696,15 +696,44 @@
   color: var(--tron-cyan);
 }
 
+.tokenBars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tokenBarRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tokenBarRowLabel {
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  color: var(--tron-text-dim);
+  width: 40px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
 .tokenBar {
+  flex: 1;
   height: 20px;
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid var(--tron-border);
   position: relative;
   overflow: hidden;
+  cursor: default;
 }
 
-.tokenBarFill {
+.tokenBarFillPeak {
+  height: 100%;
+  background: linear-gradient(90deg, var(--tron-orange), color-mix(in srgb, var(--tron-orange) 70%, var(--tron-cyan)));
+  transition: width 0.5s ease;
+}
+
+.tokenBarFillCurrent {
   height: 100%;
   background: linear-gradient(90deg, var(--tron-blue), var(--tron-cyan));
   transition: width 0.5s ease;

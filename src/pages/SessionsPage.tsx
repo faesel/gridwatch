@@ -557,17 +557,37 @@ export default function SessionsPage({ sessions, onSessionRenamed }: Props) {
           {/* Token bar */}
           {selectedSession.peakUtilisation > 0 && (
             <div className={styles.section}>
-              <div className={styles.sectionTitle}>
-                PEAK TOKEN UTILISATION — {selectedSession.peakUtilisation.toFixed(1)}%
-              </div>
-              <div className={styles.tokenBar}>
-                <div
-                  className={styles.tokenBarFill}
-                  style={{ width: `${Math.min(100, selectedSession.peakUtilisation)}%` }}
-                />
-                <span className={styles.tokenBarLabel}>
-                  {selectedSession.peakTokens.toLocaleString()} tokens
-                </span>
+              <div className={styles.sectionTitle}>TOKEN UTILISATION</div>
+              <div className={styles.tokenBars}>
+                {selectedSession.tokenHistory.length > 0 && (() => {
+                  const first = selectedSession.tokenHistory[0]
+                  return (
+                    <div className={styles.tokenBarRow}>
+                      <span className={styles.tokenBarRowLabel}>Initial</span>
+                      <div className={styles.tokenBar} title={`Initial: ${first.utilisation.toFixed(1)}% — ${first.tokens.toLocaleString()} tokens`}>
+                        <div
+                          className={styles.tokenBarFillCurrent}
+                          style={{ width: `${Math.min(100, first.utilisation)}%` }}
+                        />
+                        <span className={styles.tokenBarLabel}>
+                          {first.utilisation.toFixed(1)}% · {first.tokens.toLocaleString()} tokens
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })()}
+                <div className={styles.tokenBarRow}>
+                  <span className={styles.tokenBarRowLabel}>Peak</span>
+                  <div className={styles.tokenBar} title={`Peak: ${selectedSession.peakUtilisation.toFixed(1)}% — ${selectedSession.peakTokens.toLocaleString()} tokens`}>
+                    <div
+                      className={styles.tokenBarFillPeak}
+                      style={{ width: `${Math.min(100, selectedSession.peakUtilisation)}%` }}
+                    />
+                    <span className={styles.tokenBarLabel}>
+                      {selectedSession.peakUtilisation.toFixed(1)}% · {selectedSession.peakTokens.toLocaleString()} tokens
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           )}
