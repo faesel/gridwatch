@@ -5,7 +5,7 @@ import path from 'node:path'
 import os from 'node:os'
 import fs from 'node:fs'
 import https from 'node:https'
-import type { SessionData, TokenDataPoint, RewindSnapshot, CompactionEvent, ContextCostItem } from '../src/types/session'
+import type { SessionData, SessionSummary, SessionDetail, TokenDataPoint, RewindSnapshot, CompactionEvent, ContextCostItem } from '../src/types/session'
 import type { SkillData, SkillFile } from '../src/types/skill'
 import type { McpServerData, McpEnvVar, McpTool } from '../src/types/mcp'
 
@@ -99,10 +99,10 @@ const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/
 
 // ── IPC response cache ────────────────────────────────────────────────────────
 let sessionsCache: { data: SessionData[]; timestamp: number } | null = null
-const CACHE_TTL = 5_000 // 5 seconds
+const CACHE_TTL = 15_000 // 15 seconds — aligned with renderer refresh
 
 let logTokensCache: { data: { date: string; tokens: number; utilisation: number }[]; timestamp: number } | null = null
-const LOG_TOKENS_CACHE_TTL = 5_000 // 5 seconds
+const LOG_TOKENS_CACHE_TTL = 15_000 // 15 seconds
 
 let mcpServersCache: { data: McpServerData[]; timestamp: number } | null = null
 const MCP_CACHE_TTL = 10_000 // 10 seconds
@@ -257,7 +257,7 @@ function buildContextCost(
   return { items, totalTokens }
 }
 
-ipcMain.handle('sessions:get-all', async (): Promise<SessionData[]> => {
+async function loadAllSessions(): Promise<SessionData[]> {
   // Return cached result if fresh enough
   if (sessionsCache && Date.now() - sessionsCache.timestamp < CACHE_TTL) {
     return sessionsCache.data
@@ -400,6 +400,18 @@ ipcMain.handle('sessions:get-all', async (): Promise<SessionData[]> => {
         // Detect review sessions (code-review agent used)
         const isReview = hasCodeReviewAgent
 
+        const researchReports: string[] = (() => {
+            try {
+              const researchDir = path.join(sessionDir, 'research')
+              if (!fs.existsSync(researchDir)) return []
+              return fs.readdirSync(researchDir)
+                .filter((f) => f.endsWith('.md'))
+                .sort()
+                .map((f) => path.join(researchDir, f))
+            } catch { /* ignore */ }
+            return []
+          })()
+
         resolve({
           id: workspace.id || entry,
           cwd: workspace.cwd || '',
@@ -443,17 +455,9 @@ ipcMain.handle('sessions:get-all', async (): Promise<SessionData[]> => {
           compactions,
           isResearch,
           isReview,
-          researchReports: (() => {
-            try {
-              const researchDir = path.join(sessionDir, 'research')
-              if (!fs.existsSync(researchDir)) return []
-              return fs.readdirSync(researchDir)
-                .filter((f) => f.endsWith('.md'))
-                .sort()
-                .map((f) => path.join(researchDir, f))
-            } catch { /* ignore */ }
-            return []
-          })(),
+          userMessageCount: userMessages.length,
+          researchReportCount: researchReports.length,
+          researchReports,
           contextCost: buildContextCost(
             workspace.git_root || workspace.cwd || undefined,
           ),
@@ -471,9 +475,63 @@ ipcMain.handle('sessions:get-all', async (): Promise<SessionData[]> => {
   } catch {
     return []
   }
+}
+
+ipcMain.handle('sessions:get-all', async (): Promise<SessionData[]> => loadAllSessions())
+
+// ── IPC: sessions:get-summaries ───────────────────────────────────────────────
+// Lightweight endpoint that strips expensive detail fields from the cached data.
+// The renderer uses this for the 30-second auto-refresh cycle instead of get-all.
+
+function toSummary(s: SessionData): SessionSummary {
+  return {
+    id: s.id,
+    cwd: s.cwd,
+    gitRoot: s.gitRoot,
+    repository: s.repository,
+    branch: s.branch,
+    summary: s.summary,
+    summaryCount: s.summaryCount,
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+    turnCount: s.turnCount,
+    toolsUsed: s.toolsUsed,
+    copilotVersion: s.copilotVersion,
+    lastUserMessage: s.lastUserMessage,
+    tags: s.tags,
+    notes: s.notes,
+    peakTokens: s.peakTokens,
+    peakUtilisation: s.peakUtilisation,
+    isResearch: s.isResearch,
+    isReview: s.isReview,
+    userMessageCount: s.userMessageCount,
+    researchReportCount: s.researchReportCount,
+  }
+}
+
+ipcMain.handle('sessions:get-summaries', async (): Promise<SessionSummary[]> => {
+  const sessions = await loadAllSessions()
+  return sessions.map(toSummary)
 })
 
-// ── IPC: sessions:get-log-tokens ──────────────────────────────────────────────
+// ── IPC: sessions:get-detail ──────────────────────────────────────────────────
+// Returns expensive detail fields for a single session, sourced from the cache.
+
+ipcMain.handle('sessions:get-detail', async (_event, sessionId: string): Promise<SessionDetail | null> => {
+  if (!isValidSessionId(sessionId)) return null
+  const sessions = await loadAllSessions()
+  const session = sessions.find(s => s.id === sessionId)
+  if (!session) return null
+  return {
+    userMessages: session.userMessages,
+    tokenHistory: session.tokenHistory,
+    compactions: session.compactions,
+    rewindSnapshots: session.rewindSnapshots,
+    filesModified: session.filesModified,
+    researchReports: session.researchReports,
+    contextCost: session.contextCost,
+  }
+})
 
 ipcMain.handle(
   'sessions:get-log-tokens',

@@ -2,6 +2,8 @@ import { ipcRenderer, contextBridge, webFrame } from 'electron'
 
 contextBridge.exposeInMainWorld('gridwatchAPI', {
   getSessions: () => ipcRenderer.invoke('sessions:get-all'),
+  getSessionSummaries: () => ipcRenderer.invoke('sessions:get-summaries'),
+  getSessionDetail: (sessionId: string) => ipcRenderer.invoke('sessions:get-detail', sessionId),
   getLogTokens: () => ipcRenderer.invoke('sessions:get-log-tokens'),
   renameSession: (sessionId: string, newSummary: string) =>
     ipcRenderer.invoke('sessions:rename', sessionId, newSummary),

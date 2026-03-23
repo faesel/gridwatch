@@ -39,7 +39,8 @@ export interface ContextCost {
   totalTokens: number;
 }
 
-export interface SessionData {
+/** Lightweight session info for list views and cards — no expensive nested arrays. */
+export interface SessionSummary {
   id: string;
   cwd: string;
   gitRoot?: string;
@@ -53,17 +54,26 @@ export interface SessionData {
   toolsUsed: string[];
   copilotVersion?: string;
   lastUserMessage?: string;
-  userMessages: UserMessage[];
   tags: string[];
   notes: string;
-  rewindSnapshots: RewindSnapshot[];
-  filesModified: string[];
   peakTokens: number;
   peakUtilisation: number;
-  tokenHistory: TokenDataPoint[];
-  compactions: CompactionEvent[];
   isResearch: boolean;
   isReview: boolean;
+  userMessageCount: number;
+  researchReportCount: number;
+}
+
+/** Expensive detail fields loaded on demand for a single session. */
+export interface SessionDetail {
+  userMessages: UserMessage[];
+  tokenHistory: TokenDataPoint[];
+  compactions: CompactionEvent[];
+  rewindSnapshots: RewindSnapshot[];
+  filesModified: string[];
   researchReports: string[];
   contextCost?: ContextCost;
 }
+
+/** Full session data — summary + detail combined. */
+export interface SessionData extends SessionSummary, SessionDetail {}

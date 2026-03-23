@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import type { SessionData } from '../types/session'
+import type { SessionSummary } from '../types/session'
 import styles from './TagFilter.module.css'
 
 interface Props {
-  sessions: SessionData[]
+  sessions: SessionSummary[]
   selectedTags: Set<string>
   onChange: (tags: Set<string>) => void
 }
@@ -56,7 +56,7 @@ export default function TagFilter({ sessions, selectedTags, onChange }: Props) {
   )
 }
 
-export function filterByTags(sessions: SessionData[], selectedTags: Set<string>): SessionData[] {
+export function filterByTags(sessions: SessionSummary[], selectedTags: Set<string>): SessionSummary[] {
   if (selectedTags.size === 0) return sessions
   return sessions.filter(s =>
     (s.tags ?? []).some(t => selectedTags.has(t))

@@ -1,17 +1,17 @@
 import { useState, useRef, useEffect } from 'react'
-import type { SessionData } from '../types/session'
+import type { SessionSummary } from '../types/session'
 import styles from './SessionPicker.module.css'
 
 interface Props {
-  sessions: SessionData[]
-  selected: SessionData | null
-  onSelect: (session: SessionData | null) => void
+  sessions: SessionSummary[]
+  selected: SessionSummary | null
+  onSelect: (session: SessionSummary | null) => void
   placeholder?: string
   /** Only show sessions that have user messages */
   requireMessages?: boolean
 }
 
-function label(s: SessionData): string {
+function label(s: SessionSummary): string {
   return s.summary || s.lastUserMessage || s.id.slice(0, 12)
 }
 
@@ -21,7 +21,7 @@ export default function SessionPicker({ sessions, selected, onSelect, placeholde
   const [highlightIdx, setHighlightIdx] = useState(0)
   const wrapRef = useRef<HTMLDivElement>(null)
 
-  const pool = requireMessages ? sessions.filter((s) => s.userMessages.length > 0) : sessions
+  const pool = requireMessages ? sessions.filter((s) => s.userMessageCount > 0) : sessions
 
   const q = query.toLowerCase()
   const filtered = q
@@ -40,7 +40,7 @@ export default function SessionPicker({ sessions, selected, onSelect, placeholde
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const pick = (s: SessionData) => {
+  const pick = (s: SessionSummary) => {
     onSelect(s)
     setQuery(label(s))
     setOpen(false)
@@ -103,7 +103,7 @@ export default function SessionPicker({ sessions, selected, onSelect, placeholde
             >
               <div className={styles.optionLabel}>{label(s)}</div>
               <div className={styles.optionMeta}>
-                {s.userMessages.length} prompts · {s.createdAt.slice(0, 10)}
+                {s.userMessageCount} prompts · {s.createdAt.slice(0, 10)}
                 {s.tags.length > 0 && ` · ${s.tags.join(', ')}`}
               </div>
             </li>

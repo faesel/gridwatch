@@ -1,4 +1,4 @@
-import type { SessionData } from './session';
+import type { SessionData, SessionSummary, SessionDetail } from './session';
 import type { SkillData } from './skill';
 import type { McpServerData } from './mcp';
 
@@ -19,6 +19,8 @@ declare global {
   interface Window {
     gridwatchAPI: {
       getSessions: () => Promise<SessionData[]>;
+      getSessionSummaries: () => Promise<SessionSummary[]>;
+      getSessionDetail: (sessionId: string) => Promise<SessionDetail | null>;
       getLogTokens: () => Promise<{ date: string; tokens: number; utilisation: number }[]>;
       renameSession: (sessionId: string, newSummary: string) => Promise<boolean>;
       archiveSession: (sessionId: string) => Promise<{ ok: boolean; error?: string }>;

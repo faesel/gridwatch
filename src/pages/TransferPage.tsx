@@ -1,11 +1,11 @@
 import { useState, memo } from 'react'
-import type { SessionData } from '../types/session'
+import type { SessionSummary, UserMessage } from '../types/session'
 import { loadApiKey } from './SettingsPage'
 import SessionPicker from '../components/SessionPicker'
 import styles from './TransferPage.module.css'
 
 interface Props {
-  sessions: SessionData[]
+  sessions: SessionSummary[]
 }
 
 interface SessionContext {
@@ -16,24 +16,30 @@ interface SessionContext {
 }
 
 function TransferPage({ sessions }: Props) {
-  const [source, setSource] = useState<SessionData | null>(null)
-  const [target, setTarget] = useState<SessionData | null>(null)
+  const [source, setSource] = useState<SessionSummary | null>(null)
+  const [target, setTarget] = useState<SessionSummary | null>(null)
   const [context, setContext] = useState<SessionContext | null>(null)
+  const [sourceMessages, setSourceMessages] = useState<UserMessage[]>([])
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [transferred, setTransferred] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleSourceSelect = async (s: SessionData | null) => {
+  const handleSourceSelect = async (s: SessionSummary | null) => {
     setSource(s)
     setContext(null)
+    setSourceMessages([])
     setTransferred(false)
     setError(null)
     if (!s) return
     setLoading(true)
     try {
-      const ctx = await window.gridwatchAPI.getContext(s.id)
+      const [ctx, detail] = await Promise.all([
+        window.gridwatchAPI.getContext(s.id),
+        window.gridwatchAPI.getSessionDetail(s.id),
+      ])
       setContext(ctx)
+      if (detail) setSourceMessages(detail.userMessages)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -41,7 +47,7 @@ function TransferPage({ sessions }: Props) {
     }
   }
 
-  const handleTargetSelect = (s: SessionData | null) => {
+  const handleTargetSelect = (s: SessionSummary | null) => {
     setTarget(s)
     setTransferred(false)
     setError(null)
@@ -115,7 +121,7 @@ function TransferPage({ sessions }: Props) {
     const sourceText: string[] = []
     if (context.plan) sourceText.push(`Plan:\n${context.plan}`)
     for (const cp of context.checkpoints) sourceText.push(`Checkpoint:\n${cp}`)
-    if (source.userMessages.length > 0) sourceText.push(`User prompts:\n${source.userMessages.map(m => m.content).join('\n')}`)
+    if (sourceMessages.length > 0) sourceText.push(`User prompts:\n${sourceMessages.map(m => m.content).join('\n')}`)
     if (context.notes) sourceText.push(`Notes:\n${context.notes}`)
 
     try {
@@ -197,10 +203,10 @@ function TransferPage({ sessions }: Props) {
               <span>Checkpoints</span>
               <span className={styles.contextStatus}>{context.checkpoints.length || 'None'}</span>
             </div>
-            <div className={`${styles.contextItem} ${source.userMessages.length > 0 ? styles.contextAvailable : styles.contextEmpty}`}>
+            <div className={`${styles.contextItem} ${sourceMessages.length > 0 ? styles.contextAvailable : styles.contextEmpty}`}>
               <span className={styles.contextIcon}>💬</span>
               <span>Prompts</span>
-              <span className={styles.contextStatus}>{source.userMessages.length || 'None'}</span>
+              <span className={styles.contextStatus}>{sourceMessages.length || 'None'}</span>
             </div>
             <div className={`${styles.contextItem} ${context.notes ? styles.contextAvailable : styles.contextEmpty}`}>
               <span className={styles.contextIcon}>📝</span>

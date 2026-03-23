@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
-import type { SessionData } from '../types/session'
+import type { SessionSummary, SessionDetail } from '../types/session'
 import styles from './SessionsPage.module.css'
 
 const PAGE_SIZE = 20
 const SEARCH_DEBOUNCE_MS = 250
 
 interface Props {
-  sessions: SessionData[]
+  sessions: SessionSummary[]
   onSessionRenamed: () => void
 }
 
@@ -36,7 +36,7 @@ function formatDuration(start: string, end: string): string {
   return `${hours}h ${mins}m`
 }
 
-function getSessionStatus(session: SessionData): 'active' | 'today' | 'older' {
+function getSessionStatus(session: SessionSummary): 'active' | 'today' | 'older' {
   const now = Date.now()
   const updated = new Date(session.updatedAt).getTime()
   const diffHr = (now - updated) / 3600000
@@ -62,7 +62,9 @@ function basename(p: string): string {
 const TYPE_FILTERS = ['all', 'research', 'review', 'coding'] as const
 
 function SessionsPage({ sessions, onSessionRenamed }: Props) {
-  const [selectedSession, setSelectedSession] = useState<SessionData | null>(null)
+  const [selectedSession, setSelectedSession] = useState<SessionSummary | null>(null)
+  const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
@@ -124,8 +126,15 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
     setTransferContent(null)
     setExpandedMsgs(new Set())
     setOverflowingMsgs(new Set())
+    setSessionDetail(null)
     if (selectedSession) {
       window.gridwatchAPI.listTransfers(selectedSession.id).then(setTransfers)
+      // Lazy-load expensive detail fields
+      setDetailLoading(true)
+      window.gridwatchAPI.getSessionDetail(selectedSession.id)
+        .then(detail => setSessionDetail(detail))
+        .catch(() => {})
+        .finally(() => setDetailLoading(false))
     }
   }, [selectedSession?.id])
 
@@ -294,12 +303,12 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
 
   // Memoise derived arrays for the detail panel to avoid re-creation on every render
   const reversedMessages = useMemo(
-    () => selectedSession ? [...selectedSession.userMessages].reverse() : [],
-    [selectedSession?.userMessages]
+    () => sessionDetail ? [...sessionDetail.userMessages].reverse() : [],
+    [sessionDetail?.userMessages]
   )
   const visibleFiles = useMemo(
-    () => selectedSession ? selectedSession.filesModified.slice(0, 20) : [],
-    [selectedSession?.filesModified]
+    () => sessionDetail ? sessionDetail.filesModified.slice(0, 20) : [],
+    [sessionDetail?.filesModified]
   )
 
   return (
@@ -618,13 +627,20 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
             </div>
           )}
 
+          {/* Detail loading indicator */}
+          {detailLoading && (
+            <div className={styles.section}>
+              <div className={styles.sectionTitle} style={{ color: 'var(--tron-text-dim)' }}>LOADING SESSION DETAILS…</div>
+            </div>
+          )}
+
           {/* Token bar */}
           {selectedSession.peakUtilisation > 0 && (
             <div className={styles.section}>
               <div className={styles.sectionTitle}>TOKEN UTILISATION</div>
               <div className={styles.tokenBars}>
-                {selectedSession.tokenHistory.length > 0 && (() => {
-                  const first = selectedSession.tokenHistory[0]
+                {(sessionDetail?.tokenHistory.length ?? 0) > 0 && (() => {
+                  const first = sessionDetail!.tokenHistory[0]
                   return (
                     <div className={styles.tokenBarRow}>
                       <span className={styles.tokenBarRowLabel}>Initial</span>
@@ -657,16 +673,16 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
           )}
 
           {/* Context cost breakdown */}
-          {selectedSession.contextCost && selectedSession.contextCost.items.length > 0 && (
+          {sessionDetail?.contextCost && sessionDetail.contextCost.items.length > 0 && (
             <div className={styles.section}>
               <div className={styles.sectionTitle}>
                 CONTEXT COST
                 <span className={styles.contextCostTotal}>
-                  ~{selectedSession.contextCost.totalTokens.toLocaleString()} tokens
+                  ~{sessionDetail.contextCost.totalTokens.toLocaleString()} tokens
                 </span>
               </div>
               <div className={styles.contextCostList}>
-                {selectedSession.contextCost.items.map((item, i) => (
+                {sessionDetail.contextCost.items.map((item, i) => (
                   <div key={i} className={styles.contextCostItem}>
                     <span className={styles.contextCostLabel}>{item.label}</span>
                     <span className={styles.contextCostTokens}>
@@ -679,13 +695,13 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
           )}
 
           {/* Compactions */}
-          {(selectedSession.compactions ?? []).length > 0 && (
+          {(sessionDetail?.compactions ?? []).length > 0 && (
             <div className={styles.section}>
               <div className={styles.sectionTitle}>
-                COMPACTIONS ({selectedSession.compactions.length})
+                COMPACTIONS ({sessionDetail!.compactions.length})
               </div>
               <div className={styles.compactionList}>
-                {selectedSession.compactions.map((c, i) => (
+                {sessionDetail!.compactions.map((c, i) => (
                   <div key={i} className={styles.compactionItem}>
                     <div className={styles.compactionHeader}>
                       <span className={styles.compactionTime}>
@@ -763,10 +779,10 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
           )}
 
           {/* Prompt history from events.jsonl */}
-          {selectedSession.userMessages.length > 0 && (
+          {(sessionDetail?.userMessages.length ?? 0) > 0 && (
             <div className={styles.section}>
               <div className={styles.sectionTitle}>
-                PROMPT HISTORY ({selectedSession.userMessages.length})
+                PROMPT HISTORY ({sessionDetail!.userMessages.length})
                 <span className={styles.infoTip} data-tip="Every message you typed in this session, parsed from events.jsonl. Shown newest first.">ⓘ</span>
               </div>
               {reversedMessages.map((msg, i) => {
@@ -804,13 +820,13 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
           )}
 
           {/* Rewind snapshots */}
-          {selectedSession.rewindSnapshots.length > 0 && (
+          {(sessionDetail?.rewindSnapshots.length ?? 0) > 0 && (
             <div className={styles.section}>
               <div className={styles.sectionTitle}>
-                REWIND HISTORY ({selectedSession.rewindSnapshots.length})
+                REWIND HISTORY ({sessionDetail!.rewindSnapshots.length})
                 <span className={styles.infoTip} data-tip="Checkpoint snapshots saved by Copilot CLI at key moments. Each captures the workspace state (files, branch) so you can rewind to that point.">ⓘ</span>
               </div>
-              {selectedSession.rewindSnapshots.map((snap) => {
+              {sessionDetail!.rewindSnapshots.map((snap) => {
                 const key = `rewind-${snap.snapshotId}`
                 const isExpanded = expandedMsgs.has(key)
                 return (
@@ -843,16 +859,16 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
           )}
 
           {/* Research reports */}
-          {(selectedSession.researchReports ?? []).length > 0 && (
+          {(sessionDetail?.researchReports ?? []).length > 0 && (
             <div className={styles.section}>
               <div className={styles.sectionTitle}>
-                RESEARCH REPORTS ({selectedSession.researchReports.length})
+                RESEARCH REPORTS ({sessionDetail!.researchReports.length})
                 <span
                   className={styles.infoTip}
                   data-tip="Markdown reports generated by Copilot's research agent during this session."
                 > ⓘ</span>
               </div>
-              {selectedSession.researchReports.map((f, i) => (
+              {sessionDetail!.researchReports.map((f, i) => (
                 <div key={i} className={styles.fileItem}>
                   <span className={styles.fileName}>{basename(f).replace(/\.md$/, '')}</span>
                   <button
@@ -866,10 +882,10 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
           )}
 
           {/* Files modified */}
-          {selectedSession.filesModified.length > 0 && (
+          {(sessionDetail?.filesModified.length ?? 0) > 0 && (
             <div className={styles.section}>
               <div className={styles.sectionTitle}>
-                FILES MODIFIED ({selectedSession.filesModified.length})
+                FILES MODIFIED ({sessionDetail!.filesModified.length})
                 <span
                   className={styles.infoTip}
                   data-tip="Source files created or edited by Copilot during this session, tracked via rewind snapshots."
@@ -886,9 +902,9 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
                   >⊞</button>
                 </div>
               ))}
-              {selectedSession.filesModified.length > 20 && (
+              {sessionDetail!.filesModified.length > 20 && (
                 <div className={styles.filePath}>
-                  + {selectedSession.filesModified.length - 20} more…
+                  + {sessionDetail!.filesModified.length - 20} more…
                 </div>
               )}
             </div>

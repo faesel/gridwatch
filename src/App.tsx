@@ -1,6 +1,6 @@
 import { useState, useEffect, Component } from 'react'
 import type { ReactNode } from 'react'
-import type { SessionData } from './types/session'
+import type { SessionSummary } from './types/session'
 import styles from './App.module.css'
 import logoWordmark from './assets/logo-wordmark.svg'
 import logoWordmarkPrograms from './assets/logo-wordmark-programs.svg'
@@ -53,7 +53,7 @@ const NAV_ITEMS: NavItem[] = [
 
 function App() {
   const [activePage, setActivePage] = useState('sessions')
-  const [sessions, setSessions] = useState<SessionData[]>([])
+  const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [update, setUpdate] = useState<{ latestVersion: string; downloadUrl: string } | null>(null)
   const [appSettings, setAppSettings] = useState<AppSettings>(() => {
@@ -66,7 +66,7 @@ function App() {
 
   const load = () => {
     setRefreshKey((k) => k + 1)
-    window.gridwatchAPI.getSessions().then((data) => {
+    window.gridwatchAPI.getSessionSummaries().then((data) => {
       setSessions(data)
       setLoading(false)
     }).catch(() => setLoading(false))

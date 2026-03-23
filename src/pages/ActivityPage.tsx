@@ -8,13 +8,13 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
-import type { SessionData } from '../types/session'
+import type { SessionSummary } from '../types/session'
 import TagFilter, { filterByTags } from '../components/TagFilter'
 import { useThemeColors } from '../hooks/useThemeColors'
 import styles from './ActivityPage.module.css'
 
 interface Props {
-  sessions: SessionData[]
+  sessions: SessionSummary[]
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

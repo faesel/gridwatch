@@ -1,12 +1,12 @@
 import { useState, memo } from 'react'
-import type { SessionData } from '../types/session'
+import type { SessionSummary, UserMessage } from '../types/session'
 import type { InsightResult } from '../types/global'
 import { loadApiKey } from './SettingsPage'
 import SessionPicker from '../components/SessionPicker'
 import styles from './InsightsPage.module.css'
 
 interface Props {
-  sessions: SessionData[]
+  sessions: SessionSummary[]
 }
 
 function truncate(s: string, n: number): string {
@@ -29,19 +29,30 @@ function scoreLabel(score: number): string {
 }
 
 function InsightsPage({ sessions }: Props) {
-  const [selected, setSelected] = useState<SessionData | null>(null)
+  const [selected, setSelected] = useState<SessionSummary | null>(null)
+  const [userMessages, setUserMessages] = useState<UserMessage[]>([])
   const [result, setResult] = useState<InsightResult | null>(null)
   const [loading, setLoading] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleSelect = (s: SessionData | null) => {
+  const handleSelect = async (s: SessionSummary | null) => {
     setSelected(s)
     setResult(null)
     setError(null)
+    setUserMessages([])
+    if (s) {
+      setDetailLoading(true)
+      try {
+        const detail = await window.gridwatchAPI.getSessionDetail(s.id)
+        if (detail) setUserMessages(detail.userMessages)
+      } catch { /* ignore */ }
+      setDetailLoading(false)
+    }
   }
 
   const analyse = async () => {
-    if (!selected) return
+    if (!selected || userMessages.length === 0) return
     const apiKey = await loadApiKey()
     if (!apiKey) {
       setError('No GitHub token set. Go to Settings → GitHub Personal Access Token to add one.')
@@ -53,7 +64,7 @@ function InsightsPage({ sessions }: Props) {
     setResult(null)
 
     try {
-      const res = await window.gridwatchAPI.analyseSession(apiKey, selected.userMessages.map(m => m.content))
+      const res = await window.gridwatchAPI.analyseSession(apiKey, userMessages.map(m => m.content))
       setResult(res)
     } catch (err) {
       setError((err as Error).message || 'Analysis failed')
@@ -88,20 +99,20 @@ function InsightsPage({ sessions }: Props) {
       </div>
 
       {/* Session preview */}
-      {selected && !result && !loading && (
+      {selected && !result && !loading && !detailLoading && userMessages.length > 0 && (
         <div className={styles.preview}>
           <div className={styles.previewTitle}>
-            {selected.userMessages.length} PROMPTS IN THIS SESSION
+            {userMessages.length} PROMPTS IN THIS SESSION
           </div>
-          {selected.userMessages.slice(0, 5).map((msg, i) => (
+          {userMessages.slice(0, 5).map((msg, i) => (
             <div key={i} className={styles.previewPrompt}>
               <span className={styles.promptNum}>{i + 1}.</span>
               {truncate(msg.content, 120)}
             </div>
           ))}
-          {selected.userMessages.length > 5 && (
+          {userMessages.length > 5 && (
             <div className={styles.previewMore}>
-              + {selected.userMessages.length - 5} more prompts…
+              + {userMessages.length - 5} more prompts…
             </div>
           )}
         </div>
@@ -112,7 +123,7 @@ function InsightsPage({ sessions }: Props) {
         <div className={styles.loadingPanel}>
           <div className={styles.spinner} />
           <div className={styles.loadingText}>ANALYSING SESSION PROMPTS…</div>
-          <div className={styles.loadingSubtext}>Sending {selected?.userMessages.length} prompts to GitHub Models API</div>
+          <div className={styles.loadingSubtext}>Sending {userMessages.length} prompts to GitHub Models API</div>
         </div>
       )}
 
