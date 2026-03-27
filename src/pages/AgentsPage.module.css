@@ -1,0 +1,292 @@
+.container {
+  display: flex;
+  height: 100%;
+  gap: 0;
+}
+
+/* ── List panel ── */
+
+.listPanel {
+  width: 280px;
+  min-width: 280px;
+  border-right: 1px solid var(--tron-border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: var(--density-padding);
+}
+
+.listHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.listTitle {
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  letter-spacing: 2px;
+  color: var(--tron-cyan);
+  font-weight: 700;
+}
+
+.listCount {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  background: color-mix(in srgb, var(--tron-cyan) 8%, transparent);
+  border: 1px solid var(--tron-border);
+  padding: 1px 7px;
+  border-radius: 3px;
+}
+
+/* ── Agent card ── */
+
+.agentCard {
+  padding: 10px 10px;
+  border: 1px solid var(--tron-border);
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: transparent;
+}
+
+.agentCard:hover {
+  border-color: var(--tron-cyan);
+  background: var(--tron-grid-line);
+}
+
+.agentCardActive {
+  border-color: var(--tron-cyan);
+  background: color-mix(in srgb, var(--tron-cyan) 6%, transparent);
+  box-shadow: var(--tron-glow-cyan);
+}
+
+.agentCardRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.agentName {
+  font-size: calc(13 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text);
+  font-weight: 700;
+}
+
+.agentMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sessionCount {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+}
+
+.lastUsed {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  margin-left: auto;
+}
+
+/* ── Type badges ── */
+
+.typeBadge {
+  font-size: calc(8 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.badge_research {
+  border: 1px solid var(--tron-cyan);
+  color: var(--tron-cyan);
+}
+
+.badge_review {
+  border: 1px solid var(--tron-blue);
+  color: var(--tron-blue);
+}
+
+.badge_coding {
+  border: 1px solid var(--tron-text-dim);
+  color: var(--tron-text-dim);
+}
+
+/* ── Detail panel ── */
+
+.detailPanel {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--density-padding);
+}
+
+.detailHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--tron-border);
+}
+
+.detailTitle {
+  font-size: calc(16 * var(--font-scale, 1) * 1px);
+  color: var(--tron-cyan);
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.description {
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+/* ── Section ── */
+
+.section {
+  margin-bottom: calc(var(--density-padding) + 8px);
+}
+
+.sectionTitle {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 2px;
+  color: var(--tron-text-dim);
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--tron-border);
+  padding-bottom: 4px;
+}
+
+.fieldRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--tron-border) 40%, transparent);
+}
+
+.fieldLabel {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  letter-spacing: 0.5px;
+  min-width: 130px;
+  flex-shrink: 0;
+}
+
+.fieldValue {
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text);
+}
+
+/* ── Search input ── */
+
+.searchInput {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text);
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.searchInput:focus {
+  border-color: var(--tron-cyan);
+}
+
+/* ── Session rows ── */
+
+.sessionRow {
+  padding: 8px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--tron-border) 50%, transparent);
+}
+
+.sessionRowTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.sessionSummary {
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.sessionTime {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  flex-shrink: 0;
+}
+
+.sessionRowMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sessionRepo {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  color: var(--tron-blue);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+.sessionTurns {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+}
+
+.reportsBadge {
+  font-size: calc(8 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 1px 5px;
+  border: 1px solid var(--tron-cyan);
+  color: var(--tron-cyan);
+  border-radius: 3px;
+}
+
+/* ── Empty states ── */
+
+.emptyState {
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  padding: 20px 0;
+  text-align: center;
+}
+
+.emptyDetail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--tron-text-dim);
+}
+
+.emptyIcon {
+  font-size: 40px;
+  margin-bottom: 12px;
+  opacity: 0.3;
+}
+
+.emptyLabel {
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+}
