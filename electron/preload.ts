@@ -67,4 +67,10 @@ contextBridge.exposeInMainWorld('gridwatchAPI', {
   getCustomAgents: () => ipcRenderer.invoke('agents:get-all'),
   getAgentFile: (agentName: string, fileName: string) =>
     ipcRenderer.invoke('agents:get-file', agentName, fileName),
+
+  // Window controls
+  getPlatform: () => ipcRenderer.invoke('app:get-platform'),
+  windowMinimize: () => ipcRenderer.invoke('window:minimize'),
+  windowMaximize: () => ipcRenderer.invoke('window:maximize'),
+  windowClose: () => ipcRenderer.invoke('window:close'),
 })

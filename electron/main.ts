@@ -918,6 +918,26 @@ ipcMain.handle('app:show-in-folder', async (_e, filePath: string) => {
   shell.showItemInFolder(filePath)
 })
 
+// ── IPC: window controls ───────────────────────────────────────────────────────
+
+ipcMain.handle('app:get-platform', () => process.platform)
+
+ipcMain.handle('window:minimize', () => {
+  win?.minimize()
+})
+
+ipcMain.handle('window:maximize', () => {
+  if (win?.isMaximized()) {
+    win.unmaximize()
+  } else {
+    win?.maximize()
+  }
+})
+
+ipcMain.handle('window:close', () => {
+  win?.close()
+})
+
 // ── IPC: secure token storage ──────────────────────────────────────────────────
 
 const TOKEN_FILE = path.join(os.homedir(), '.copilot', 'gridwatch-token.enc')

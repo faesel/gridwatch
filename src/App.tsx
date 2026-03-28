@@ -58,6 +58,7 @@ function App() {
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [update, setUpdate] = useState<{ latestVersion: string; downloadUrl: string } | null>(null)
+  const [platform, setPlatform] = useState<string>('darwin')
   const [appSettings, setAppSettings] = useState<AppSettings>(() => {
     const s = loadSettings()
     applySettings(s)
@@ -78,6 +79,10 @@ function App() {
     load()
     const interval = setInterval(load, 30_000)
     return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    window.gridwatchAPI.getPlatform().then(setPlatform).catch(() => {})
   }, [])
 
   // Check for updates on startup
@@ -109,8 +114,21 @@ function App() {
 
   return (
     <div className={styles.app}>
-      <div className={styles.titlebar}>
+      <div className={`${styles.titlebar} ${platform !== 'darwin' ? styles.titlebarWindows : ''}`}>
         <img src={appSettings.theme === 'programs' ? logoWordmarkPrograms : logoWordmark} alt="GridWatch" />
+        {platform !== 'darwin' && (
+          <div className={styles.windowControls}>
+            <button className={styles.windowControlBtn} onClick={() => window.gridwatchAPI.windowMinimize()} title="Minimise">
+              <svg width="10" height="1" viewBox="0 0 10 1"><rect fill="currentColor" width="10" height="1" /></svg>
+            </button>
+            <button className={styles.windowControlBtn} onClick={() => window.gridwatchAPI.windowMaximize()} title="Maximise">
+              <svg width="10" height="10" viewBox="0 0 10 10"><rect fill="none" stroke="currentColor" strokeWidth="1" x="0.5" y="0.5" width="9" height="9" /></svg>
+            </button>
+            <button className={`${styles.windowControlBtn} ${styles.windowControlBtnClose}`} onClick={() => window.gridwatchAPI.windowClose()} title="Close">
+              <svg width="10" height="10" viewBox="0 0 10 10"><path fill="currentColor" d="M1 0L0 1l4 4-4 4 1 1 4-4 4 4 1-1-4-4 4-4-1-1-4 4z" /></svg>
+            </button>
+          </div>
+        )}
       </div>
       {update && (
         <div className={styles.updateBanner}>

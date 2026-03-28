@@ -16,9 +16,42 @@
   flex-shrink: 0;
 }
 
+.titlebarWindows {
+  padding-left: 16px;
+}
+
 .titlebar img {
   height: 36px;
   -webkit-app-region: no-drag;
+}
+
+.windowControls {
+  margin-left: auto;
+  display: flex;
+  -webkit-app-region: no-drag;
+}
+
+.windowControlBtn {
+  background: none;
+  border: none;
+  color: var(--tron-text-dim);
+  width: 46px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.windowControlBtn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--tron-text);
+}
+
+.windowControlBtnClose:hover {
+  background: #e81123;
+  color: #fff;
 }
 
 .body {
@@ -79,6 +112,7 @@
   font-size: calc(16 * var(--font-scale, 1) * 1px);
   width: 20px;
   text-align: center;
+  font-variant-emoji: text;
 }
 
 .content {

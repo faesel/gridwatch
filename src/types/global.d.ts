@@ -68,6 +68,12 @@ declare global {
       // Agents
       getCustomAgents: () => Promise<CustomAgentData[]>;
       getAgentFile: (agentName: string, fileName: string) => Promise<string | null>;
+
+      // Window controls
+      getPlatform: () => Promise<string>;
+      windowMinimize: () => Promise<void>;
+      windowMaximize: () => Promise<void>;
+      windowClose: () => Promise<void>;
     };
   }
   const __APP_VERSION__: string;
