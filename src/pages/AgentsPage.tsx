@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, memo } from 'react'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import type { SessionSummary } from '../types/session'
 import type { CustomAgentData } from '../types/agent'
 import styles from './AgentsPage.module.css'
@@ -114,7 +115,7 @@ function stripFrontmatter(raw: string): string {
 
 function renderMarkdown(raw: string) {
   const body = stripFrontmatter(raw)
-  const html = marked.parse(body, { async: false }) as string
+  const html = DOMPurify.sanitize(marked.parse(body, { async: false }) as string)
   return <div className={styles.markdownView} dangerouslySetInnerHTML={{ __html: html }} />
 }
 

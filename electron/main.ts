@@ -913,6 +913,8 @@ ipcMain.handle('app:open-external', async (_e, url: string) => {
 
 ipcMain.handle('app:show-in-folder', async (_e, filePath: string) => {
   if (typeof filePath !== 'string') throw new Error('Invalid path')
+  const copilotBase = path.join(os.homedir(), '.copilot')
+  if (!isPathWithin(filePath, copilotBase)) throw new Error('Path outside allowed directory')
   shell.showItemInFolder(filePath)
 })
 
@@ -1325,8 +1327,8 @@ ipcMain.handle('skills:export', async (_e, skillName: string): Promise<{ ok: boo
   if (canceled || !filePath) return { ok: false, error: 'Export cancelled' }
 
   try {
-    const { execSync } = require('child_process') as typeof import('child_process')
-    execSync(`cd "${path.dirname(srcDir)}" && zip -r "${filePath}" "${skillName}"`)
+    const { execFileSync } = require('child_process') as typeof import('child_process')
+    execFileSync('zip', ['-r', filePath, skillName], { cwd: path.dirname(srcDir) })
     return { ok: true, filePath }
   } catch (err) {
     return { ok: false, error: (err as Error).message }
@@ -1724,8 +1726,8 @@ ipcMain.handle('agents:get-all', async (): Promise<CustomAgentData[]> => {
         const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
         if (fmMatch && jsyaml) {
           const fm = jsyaml.load(fmMatch[1]) || {}
-          if (fm.name) displayName = fm.name
-          if (fm.description) description = fm.description
+          if (typeof fm.name === 'string') displayName = fm.name
+          if (typeof fm.description === 'string') description = fm.description
         }
       } catch { /* skip parse errors */ }
 
@@ -1736,7 +1738,6 @@ ipcMain.handle('agents:get-all', async (): Promise<CustomAgentData[]> => {
         description,
         files: [{
           name: entry.name,
-          path: filePath,
           size: stat.size,
           modifiedAt: new Date(stat.mtimeMs).toISOString(),
         }],
@@ -1749,8 +1750,13 @@ ipcMain.handle('agents:get-all', async (): Promise<CustomAgentData[]> => {
   return agents.sort((a, b) => a.displayName.localeCompare(b.displayName))
 })
 
+const AGENT_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/
+function isValidAgentName(name: string): boolean {
+  return typeof name === 'string' && name.length > 0 && name.length <= 100 && AGENT_NAME_PATTERN.test(name)
+}
+
 ipcMain.handle('agents:get-file', async (_e, agentName: string, fileName: string): Promise<string | null> => {
-  if (typeof agentName !== 'string' || !agentName || typeof fileName !== 'string' || !fileName) return null
+  if (!isValidAgentName(agentName) || typeof fileName !== 'string' || !fileName) return null
   const agentsDir = path.join(os.homedir(), '.copilot', 'agents')
   const expectedFile = `${agentName}.agent.md`
   if (fileName !== expectedFile) return null

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import type { SkillData } from '../types/skill'
 import styles from './SkillsPage.module.css'
 
@@ -281,7 +282,7 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
 
   const renderMarkdown = (raw: string) => {
     const body = stripFrontmatter(raw)
-    const html = marked.parse(body, { async: false }) as string
+    const html = DOMPurify.sanitize(marked.parse(body, { async: false }) as string)
     return <div className={styles.markdownView} dangerouslySetInnerHTML={{ __html: html }} />
   }
 
