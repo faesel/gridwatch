@@ -1,6 +1,7 @@
 import type { SessionData, SessionSummary, SessionDetail } from './session';
 import type { SkillData } from './skill';
 import type { McpServerData } from './mcp';
+import type { CustomAgentData } from './agent';
 
 export interface PromptFeedback {
   prompt: string;
@@ -63,6 +64,10 @@ declare global {
       getMcpServers: () => Promise<McpServerData[]>;
       showMcpConfig: () => Promise<void>;
       toggleMcpServer: (serverName: string) => Promise<{ ok: boolean; enabled: boolean; error?: string }>;
+
+      // Agents
+      getCustomAgents: () => Promise<CustomAgentData[]>;
+      getAgentFile: (agentName: string, fileName: string) => Promise<string | null>;
     };
   }
   const __APP_VERSION__: string;

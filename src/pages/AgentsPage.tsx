@@ -1,8 +1,13 @@
-import { useState, useMemo, memo } from 'react'
+import { useState, useMemo, useEffect, memo } from 'react'
+import { marked } from 'marked'
 import type { SessionSummary } from '../types/session'
+import type { CustomAgentData } from '../types/agent'
 import styles from './AgentsPage.module.css'
 
-interface AgentType {
+const MAX_VISIBLE_SESSIONS = 5
+
+interface BuiltInAgent {
+  kind: 'built-in'
   id: string
   displayName: string
   description: string
@@ -10,14 +15,27 @@ interface AgentType {
   sessions: SessionSummary[]
 }
 
-/** Build the fixed list of agent types from session data */
-function buildAgentTypes(sessions: SessionSummary[]): AgentType[] {
+interface CustomAgent {
+  kind: 'custom'
+  id: string
+  displayName: string
+  description: string
+  badge: 'custom'
+  sessions: SessionSummary[]
+  data: CustomAgentData
+}
+
+type AgentType = BuiltInAgent | CustomAgent
+
+/** Build the fixed list of built-in agent types from session data */
+function buildBuiltInAgents(sessions: SessionSummary[]): BuiltInAgent[] {
   const research = sessions.filter(s => s.isResearch)
   const review = sessions.filter(s => s.isReview)
   const coding = sessions.filter(s => !s.isResearch && !s.isReview)
 
   return [
     {
+      kind: 'built-in',
       id: 'research',
       displayName: 'Research',
       description: 'Sessions handled by the Research agent, triggered when a prompt starts with "Researching:". Produces markdown research reports.',
@@ -25,6 +43,7 @@ function buildAgentTypes(sessions: SessionSummary[]): AgentType[] {
       sessions: research,
     },
     {
+      kind: 'built-in',
       id: 'code-review',
       displayName: 'Code Review',
       description: 'Sessions that invoked the code-review agent, detected via the agent_type field in events.jsonl.',
@@ -32,6 +51,7 @@ function buildAgentTypes(sessions: SessionSummary[]): AgentType[] {
       sessions: review,
     },
     {
+      kind: 'built-in',
       id: 'coding',
       displayName: 'Coding',
       description: 'Standard Copilot coding sessions — the default agent for writing, editing, and refactoring code.',
@@ -39,6 +59,29 @@ function buildAgentTypes(sessions: SessionSummary[]): AgentType[] {
       sessions: coding,
     },
   ]
+}
+
+/** Build custom agent entries from the agents directory scan, linking matching sessions */
+function buildCustomAgents(customAgents: CustomAgentData[], sessions: SessionSummary[]): CustomAgent[] {
+  return customAgents.map(agent => {
+    const name = agent.name.toLowerCase()
+    const displayName = agent.displayName.toLowerCase()
+    const matched = sessions.filter(s =>
+      (s.agentTypes ?? []).some(t => {
+        const tLower = t.toLowerCase()
+        return tLower === name || tLower === displayName
+      })
+    )
+    return {
+      kind: 'custom',
+      id: `custom-${agent.name}`,
+      displayName: agent.displayName,
+      description: agent.description || 'Custom agent — no description provided.',
+      badge: 'custom' as const,
+      sessions: matched,
+      data: agent,
+    }
+  })
 }
 
 /** Format a date as a relative "N days ago" string */
@@ -55,17 +98,66 @@ function relativeTime(iso: string): string {
   return `${months}mo ago`
 }
 
-interface AgentsPageProps {
-  sessions: SessionSummary[]
+function badgeLabel(badge: AgentType['badge']): string {
+  switch (badge) {
+    case 'research': return 'RESEARCH'
+    case 'review': return 'REVIEW'
+    case 'coding': return 'CODING'
+    case 'custom': return 'CUSTOM'
+  }
 }
 
-function AgentsPage({ sessions }: AgentsPageProps) {
+/** Strip YAML frontmatter before rendering markdown */
+function stripFrontmatter(raw: string): string {
+  return raw.replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, '')
+}
+
+function renderMarkdown(raw: string) {
+  const body = stripFrontmatter(raw)
+  const html = marked.parse(body, { async: false }) as string
+  return <div className={styles.markdownView} dangerouslySetInnerHTML={{ __html: html }} />
+}
+
+interface AgentsPageProps {
+  sessions: SessionSummary[]
+  refreshKey: number
+}
+
+function AgentsPage({ sessions, refreshKey }: AgentsPageProps) {
   const [selected, setSelected] = useState<AgentType | null>(null)
   const [sessionSearch, setSessionSearch] = useState('')
+  const [customAgents, setCustomAgents] = useState<CustomAgentData[]>([])
+  const [activeFile, setActiveFile] = useState('')
+  const [fileContent, setFileContent] = useState('')
+  const [fileLoading, setFileLoading] = useState(false)
+  const [showAllSessions, setShowAllSessions] = useState(false)
 
-  const agentTypes = useMemo(() => buildAgentTypes(sessions), [sessions])
+  useEffect(() => {
+    window.gridwatchAPI.getCustomAgents()
+      .then(setCustomAgents)
+      .catch(() => setCustomAgents([]))
+  }, [refreshKey])
 
-  // Keep selection in sync when sessions update
+  // Load file content when a custom agent file is selected
+  useEffect(() => {
+    if (!selected || selected.kind !== 'custom' || !activeFile) {
+      setFileContent('')
+      return
+    }
+    setFileLoading(true)
+    window.gridwatchAPI.getAgentFile(selected.data.name, activeFile)
+      .then((content) => setFileContent(content ?? ''))
+      .catch(() => setFileContent(''))
+      .finally(() => setFileLoading(false))
+  }, [selected?.kind === 'custom' ? selected.data.name : null, activeFile])
+
+  const agentTypes = useMemo(() => {
+    const builtIn = buildBuiltInAgents(sessions)
+    const custom = buildCustomAgents(customAgents, sessions)
+    return [...builtIn, ...custom]
+  }, [sessions, customAgents])
+
+  // Keep selection in sync when sessions/agents update
   const syncedSelected = useMemo(() => {
     if (!selected) return null
     return agentTypes.find((a: AgentType) => a.id === selected.id) ?? null
@@ -74,12 +166,19 @@ function AgentsPage({ sessions }: AgentsPageProps) {
   const handleSelect = (agent: AgentType) => {
     setSelected(agent)
     setSessionSearch('')
+    setShowAllSessions(false)
+    if (agent.kind === 'custom' && agent.data.files.length > 0) {
+      const agentMd = agent.data.files.find(f => f.name === 'AGENT.md')
+      setActiveFile(agentMd ? agentMd.name : agent.data.files[0].name)
+    } else {
+      setActiveFile('')
+    }
   }
 
   const displayedAgent = syncedSelected
 
   const filteredSessions = useMemo(() => {
-    if (!displayedAgent) return []
+    if (!displayedAgent || displayedAgent.sessions.length === 0) return []
     const q = sessionSearch.toLowerCase()
     return displayedAgent.sessions
       .filter((s: SessionSummary) =>
@@ -128,19 +227,28 @@ function AgentsPage({ sessions }: AgentsPageProps) {
             <div className={styles.agentCardRow}>
               <span className={styles.agentName}>{agent.displayName}</span>
               <span className={`${styles.typeBadge} ${styles[`badge_${agent.badge}`]}`}>
-                {agent.badge === 'research' ? 'RESEARCH' : agent.badge === 'review' ? 'REVIEW' : 'CODING'}
+                {badgeLabel(agent.badge)}
               </span>
             </div>
             <div className={styles.agentMeta}>
-              <span className={styles.sessionCount}>{agent.sessions.length} sessions</span>
-              {agent.sessions.length > 0 && (
-                <span className={styles.lastUsed}>
-                  {relativeTime(
-                    agent.sessions.reduce((a: SessionSummary, b: SessionSummary) =>
-                      new Date(b.updatedAt) > new Date(a.updatedAt) ? b : a
-                    ).updatedAt
+              {agent.kind === 'built-in' ? (
+                <>
+                  <span className={styles.sessionCount}>{agent.sessions.length} sessions</span>
+                  {agent.sessions.length > 0 && (
+                    <span className={styles.lastUsed}>
+                      {relativeTime(
+                        agent.sessions.reduce((a: SessionSummary, b: SessionSummary) =>
+                          new Date(b.updatedAt) > new Date(a.updatedAt) ? b : a
+                        ).updatedAt
+                      )}
+                    </span>
                   )}
-                </span>
+                </>
+              ) : (
+                <>
+                  <span className={styles.sessionCount}>{agent.data.files.length} files</span>
+                  <span className={styles.lastUsed}>{relativeTime(agent.data.modifiedAt)}</span>
+                </>
               )}
             </div>
           </div>
@@ -154,14 +262,14 @@ function AgentsPage({ sessions }: AgentsPageProps) {
             <div className={styles.detailHeader}>
               <div className={styles.detailTitle}>{displayedAgent.displayName}</div>
               <span className={`${styles.typeBadge} ${styles[`badge_${displayedAgent.badge}`]}`}>
-                {displayedAgent.badge === 'research' ? 'RESEARCH' : displayedAgent.badge === 'review' ? 'REVIEW' : 'CODING'}
+                {badgeLabel(displayedAgent.badge)}
               </span>
             </div>
 
             <div className={styles.description}>{displayedAgent.description}</div>
 
-            {/* Overview */}
-            {stats && (
+            {/* Overview for built-in agents */}
+            {displayedAgent.kind === 'built-in' && stats && (
               <div className={styles.section}>
                 <div className={styles.sectionTitle}>OVERVIEW</div>
                 <div className={styles.fieldRow}>
@@ -193,53 +301,124 @@ function AgentsPage({ sessions }: AgentsPageProps) {
               </div>
             )}
 
-            {/* Sessions list */}
-            <div className={styles.section}>
-              <div className={styles.sectionTitle}>
-                SESSIONS ({displayedAgent.sessions.length})
+            {/* Overview for custom agents */}
+            {displayedAgent.kind === 'custom' && (
+              <div className={styles.section}>
+                <div className={styles.sectionTitle}>DETAILS</div>
+                <div className={styles.fieldRow}>
+                  <span className={styles.fieldLabel}>Folder</span>
+                  <span className={styles.fieldValue}>{displayedAgent.data.name}</span>
+                </div>
+                <div className={styles.fieldRow}>
+                  <span className={styles.fieldLabel}>Created</span>
+                  <span className={styles.fieldValue}>{relativeTime(displayedAgent.data.createdAt)}</span>
+                </div>
+                <div className={styles.fieldRow}>
+                  <span className={styles.fieldLabel}>Last modified</span>
+                  <span className={styles.fieldValue}>{relativeTime(displayedAgent.data.modifiedAt)}</span>
+                </div>
+                <div className={styles.fieldRow}>
+                  <span className={styles.fieldLabel}>Files</span>
+                  <span className={styles.fieldValue}>{displayedAgent.data.files.length}</span>
+                </div>
               </div>
+            )}
 
-              {displayedAgent.sessions.length > 6 && (
-                <input
-                  className={styles.searchInput}
-                  type="text"
-                  placeholder="Filter sessions…"
-                  value={sessionSearch}
-                  onChange={(e) => setSessionSearch(e.target.value)}
-                />
-              )}
-
-              {filteredSessions.length === 0 && (
-                <div className={styles.emptyState}>
-                  {sessionSearch ? `No sessions match "${sessionSearch}"` : 'No sessions for this agent type'}
+            {/* File viewer for custom agents */}
+            {displayedAgent.kind === 'custom' && displayedAgent.data.files.length > 0 && (
+              <div className={styles.section}>
+                <div className={styles.sectionTitle}>
+                  FILES ({displayedAgent.data.files.length})
                 </div>
-              )}
 
-              {filteredSessions.map((s: SessionSummary) => (
-                <div key={s.id} className={styles.sessionRow}>
-                  <div className={styles.sessionRowTop}>
-                    <span className={styles.sessionSummary}>
-                      {s.summary || s.lastUserMessage || s.id.slice(0, 8)}
-                    </span>
-                    <span className={styles.sessionTime}>{relativeTime(s.updatedAt)}</span>
-                  </div>
-                  <div className={styles.sessionRowMeta}>
-                    {s.repository && (
-                      <span className={styles.sessionRepo}>{s.repository}</span>
-                    )}
-                    <span className={styles.sessionTurns}>{s.turnCount} turns</span>
-                    {s.researchReportCount > 0 && (
-                      <span className={styles.reportsBadge}>{s.researchReportCount} reports</span>
-                    )}
-                  </div>
+                <div className={styles.fileTabs}>
+                  {displayedAgent.data.files.map((f) => (
+                    <button
+                      key={f.name}
+                      className={`${styles.fileTab} ${activeFile === f.name ? styles.fileTabActive : ''}`}
+                      onClick={() => setActiveFile(f.name)}
+                    >
+                      {f.name}
+                    </button>
+                  ))}
                 </div>
-              ))}
-            </div>
+
+                {fileLoading ? (
+                  <div className={styles.emptyState}>LOADING…</div>
+                ) : fileContent ? (
+                  <div className={styles.fileContent}>
+                    {(activeFile.endsWith('.md') || activeFile.endsWith('.markdown'))
+                      ? renderMarkdown(fileContent)
+                      : <pre className={styles.codeBlock}>{fileContent}</pre>
+                    }
+                  </div>
+                ) : (
+                  <div className={styles.emptyState}>No content</div>
+                )}
+              </div>
+            )}
+
+            {/* Sessions list */}
+            {displayedAgent.sessions.length > 0 && (
+              <div className={styles.section}>
+                <div className={styles.sectionTitle}>
+                  SESSIONS ({displayedAgent.sessions.length})
+                </div>
+
+                {displayedAgent.sessions.length > 6 && (
+                  <input
+                    className={styles.searchInput}
+                    type="text"
+                    placeholder="Filter sessions…"
+                    value={sessionSearch}
+                    onChange={(e) => setSessionSearch(e.target.value)}
+                  />
+                )}
+
+                {filteredSessions.length === 0 && (
+                  <div className={styles.emptyState}>
+                    {sessionSearch ? `No sessions match "${sessionSearch}"` : 'No sessions for this agent'}
+                  </div>
+                )}
+
+                {(showAllSessions ? filteredSessions : filteredSessions.slice(0, MAX_VISIBLE_SESSIONS)).map((s: SessionSummary) => (
+                  <div key={s.id} className={styles.sessionRow}>
+                    <div className={styles.sessionRowTop}>
+                      <span className={styles.sessionSummary}>
+                        {s.summary || s.lastUserMessage || s.id.slice(0, 8)}
+                      </span>
+                      <span className={styles.sessionTime}>{relativeTime(s.updatedAt)}</span>
+                    </div>
+                    <div className={styles.sessionRowMeta}>
+                      {s.repository && (
+                        <span className={styles.sessionRepo}>{s.repository}</span>
+                      )}
+                      <span className={styles.sessionTurns}>{s.turnCount} turns</span>
+                      {s.researchReportCount > 0 && (
+                        <span className={styles.reportsBadge}>{s.researchReportCount} reports</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {filteredSessions.length > MAX_VISIBLE_SESSIONS && (
+                  <button
+                    className={styles.showMoreBtn}
+                    onClick={() => setShowAllSessions(v => !v)}
+                  >
+                    {showAllSessions
+                      ? 'SHOW LESS'
+                      : `SHOW ALL ${filteredSessions.length} SESSIONS`
+                    }
+                  </button>
+                )}
+              </div>
+            )}
           </>
         ) : (
           <div className={styles.emptyDetail}>
             <div className={styles.emptyIcon}>◎</div>
-            <div className={styles.emptyLabel}>Select an agent type to view its sessions</div>
+            <div className={styles.emptyLabel}>Select an agent to view details</div>
           </div>
         )}
       </div>

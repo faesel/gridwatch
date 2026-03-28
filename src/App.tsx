@@ -99,7 +99,7 @@ function App() {
       case 'activity': return <ActivityPage sessions={sessions} />
       case 'skills': return <SkillsPage refreshKey={refreshKey} />
       case 'mcp': return <McpPage refreshKey={refreshKey} />
-      case 'agents': return <AgentsPage sessions={sessions} />
+      case 'agents': return <AgentsPage sessions={sessions} refreshKey={refreshKey} />
       case 'insights': return <InsightsPage sessions={sessions} />
       case 'transfer': return <TransferPage sessions={sessions} />
       case 'settings': return <SettingsPage settings={appSettings} onChange={setAppSettings} />

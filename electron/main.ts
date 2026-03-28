@@ -7,6 +7,7 @@ import fs from 'node:fs'
 import https from 'node:https'
 import type { SessionData, SessionSummary, SessionDetail, TokenDataPoint, RewindSnapshot, CompactionEvent, ContextCostItem } from '../src/types/session'
 import type { SkillData, SkillFile } from '../src/types/skill'
+import type { CustomAgentData } from '../src/types/agent'
 import type { McpServerData, McpEnvVar, McpTool } from '../src/types/mcp'
 
 // Must be set before app is ready so the OS picks it up for dock/taskbar tooltip
@@ -300,6 +301,7 @@ async function loadAllSessions(): Promise<SessionData[]> {
         let lastUserMessage: string | undefined
         const userMessages: { content: string; model?: string; timestamp?: string }[] = []
         let hasCodeReviewAgent = false
+        const agentTypesUsed = new Set<string>()
 
         const eventsFile = path.join(sessionDir, 'events.jsonl')
         if (fs.existsSync(eventsFile)) {
@@ -307,6 +309,8 @@ async function loadAllSessions(): Promise<SessionData[]> {
           const allEvents: { type: string; data?: Record<string, unknown>; timestamp?: string }[] = []
           for (const line of eventsContent.split('\n')) {
             if (line.includes('"agent_type":"code-review"')) hasCodeReviewAgent = true
+            const agentMatch = line.match(/"agent_type"\s*:\s*"([^"]+)"/)
+            if (agentMatch) agentTypesUsed.add(agentMatch[1])
             if (!line.includes('session.start') && !line.includes('user.message') && !line.includes('tool.execution_start') && !line.includes('tool.execution_complete')) continue
             try {
               allEvents.push(JSON.parse(line))
@@ -472,6 +476,7 @@ async function loadAllSessions(): Promise<SessionData[]> {
           compactions,
           isResearch,
           isReview,
+          agentTypes: Array.from(agentTypesUsed),
           userMessageCount: userMessages.length,
           researchReportCount: researchReports.length,
           researchReports,
@@ -521,6 +526,7 @@ function toSummary(s: SessionData): SessionSummary {
     peakUtilisation: s.peakUtilisation,
     isResearch: s.isResearch,
     isReview: s.isReview,
+    agentTypes: s.agentTypes,
     userMessageCount: s.userMessageCount,
     researchReportCount: s.researchReportCount,
   }
@@ -1695,5 +1701,65 @@ ipcMain.handle('mcp:toggle-server', async (_e, serverName: string): Promise<{ ok
     return { ok: false, enabled: false, error: 'Server not found' }
   } catch (err) {
     return { ok: false, enabled: false, error: (err as Error).message }
+  }
+})
+
+// ── Agents IPC ──────────────────────────────────────────────────────────
+
+ipcMain.handle('agents:get-all', async (): Promise<CustomAgentData[]> => {
+  const agentsDir = path.join(os.homedir(), '.copilot', 'agents')
+  if (!fs.existsSync(agentsDir)) return []
+
+  const agents: CustomAgentData[] = []
+  try {
+    for (const entry of fs.readdirSync(agentsDir, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith('.agent.md')) continue
+      const filePath = path.join(agentsDir, entry.name)
+      const agentId = entry.name.replace(/\.agent\.md$/, '')
+
+      let displayName = agentId
+      let description = ''
+      try {
+        const content = fs.readFileSync(filePath, 'utf-8')
+        const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
+        if (fmMatch && jsyaml) {
+          const fm = jsyaml.load(fmMatch[1]) || {}
+          if (fm.name) displayName = fm.name
+          if (fm.description) description = fm.description
+        }
+      } catch { /* skip parse errors */ }
+
+      const stat = fs.statSync(filePath)
+      agents.push({
+        name: agentId,
+        displayName,
+        description,
+        files: [{
+          name: entry.name,
+          path: filePath,
+          size: stat.size,
+          modifiedAt: new Date(stat.mtimeMs).toISOString(),
+        }],
+        createdAt: new Date(stat.birthtimeMs).toISOString(),
+        modifiedAt: new Date(stat.mtimeMs).toISOString(),
+      })
+    }
+  } catch { /* skip */ }
+
+  return agents.sort((a, b) => a.displayName.localeCompare(b.displayName))
+})
+
+ipcMain.handle('agents:get-file', async (_e, agentName: string, fileName: string): Promise<string | null> => {
+  if (typeof agentName !== 'string' || !agentName || typeof fileName !== 'string' || !fileName) return null
+  const agentsDir = path.join(os.homedir(), '.copilot', 'agents')
+  const expectedFile = `${agentName}.agent.md`
+  if (fileName !== expectedFile) return null
+  const filePath = path.join(agentsDir, expectedFile)
+  if (!isPathWithin(filePath, agentsDir)) return null
+  if (!fs.existsSync(filePath)) return null
+  try {
+    return fs.readFileSync(filePath, 'utf-8')
+  } catch {
+    return null
   }
 })

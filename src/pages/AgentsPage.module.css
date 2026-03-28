@@ -116,6 +116,11 @@
   color: var(--tron-text-dim);
 }
 
+.badge_custom {
+  border: 1px solid var(--tron-orange);
+  color: var(--tron-orange);
+}
+
 /* ── Detail panel ── */
 
 .detailPanel {
@@ -260,6 +265,166 @@
   border: 1px solid var(--tron-cyan);
   color: var(--tron-cyan);
   border-radius: 3px;
+}
+
+.showMoreBtn {
+  display: block;
+  width: 100%;
+  background: none;
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text-dim);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  font-family: inherit;
+  letter-spacing: 1px;
+  padding: 8px;
+  margin-top: 8px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.showMoreBtn:hover {
+  color: var(--tron-cyan);
+  border-color: var(--tron-cyan);
+}
+
+/* ── File tabs & content viewer ── */
+
+.fileTabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--tron-border);
+  margin-bottom: 12px;
+  overflow-x: auto;
+}
+
+.fileTab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--tron-text-dim);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  font-family: inherit;
+  letter-spacing: 0.5px;
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.fileTab:hover {
+  color: var(--tron-text);
+}
+
+.fileTabActive {
+  color: var(--tron-cyan);
+  border-bottom-color: var(--tron-cyan);
+}
+
+.fileContent {
+  max-height: 600px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.codeBlock {
+  color: var(--tron-text);
+  white-space: pre-wrap;
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
+  margin: 0;
+}
+
+/* ── Markdown rendering ── */
+
+.markdownView {
+  line-height: 1.7;
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text);
+}
+
+.markdownView h1,
+.markdownView h2,
+.markdownView h3 {
+  color: var(--tron-cyan);
+  margin: 1.2em 0 0.5em;
+  letter-spacing: 0.5px;
+}
+
+.markdownView h1 { font-size: calc(18 * var(--font-scale, 1) * 1px); }
+.markdownView h2 { font-size: calc(15 * var(--font-scale, 1) * 1px); }
+.markdownView h3 { font-size: calc(13 * var(--font-scale, 1) * 1px); }
+
+.markdownView p { margin: 0.6em 0; }
+
+.markdownView code {
+  background: color-mix(in srgb, var(--tron-blue) 10%, transparent);
+  color: var(--tron-blue);
+  padding: 2px 5px;
+  border-radius: 2px;
+  font-size: 0.9em;
+}
+
+.markdownView pre {
+  background: var(--tron-bg);
+  border: 1px solid var(--tron-border);
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 0.8em 0;
+  border-radius: 2px;
+}
+
+.markdownView pre code {
+  background: none;
+  padding: 0;
+  color: var(--tron-text);
+}
+
+.markdownView ul,
+.markdownView ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.markdownView li { margin: 0.3em 0; }
+
+.markdownView a {
+  color: var(--tron-cyan);
+  text-decoration: none;
+}
+
+.markdownView a:hover { text-decoration: underline; }
+
+.markdownView strong { color: var(--tron-cyan); }
+
+.markdownView blockquote {
+  border-left: 3px solid var(--tron-border);
+  padding-left: 12px;
+  color: var(--tron-text-dim);
+  margin: 0.8em 0;
+}
+
+.markdownView hr {
+  border: none;
+  border-top: 1px solid var(--tron-border);
+  margin: 1.5em 0;
+}
+
+.markdownView table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.8em 0;
+}
+
+.markdownView th,
+.markdownView td {
+  border: 1px solid var(--tron-border);
+  padding: 6px 10px;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  text-align: left;
+}
+
+.markdownView th {
+  color: var(--tron-cyan);
+  background: color-mix(in srgb, var(--tron-cyan) 6%, transparent);
 }
 
 /* ── Empty states ── */

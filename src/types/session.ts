@@ -61,6 +61,7 @@ export interface SessionSummary {
   peakUtilisation: number;
   isResearch: boolean;
   isReview: boolean;
+  agentTypes: string[];
   userMessageCount: number;
   researchReportCount: number;
 }
