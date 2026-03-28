@@ -28,6 +28,7 @@ GridWatch reads the local session data written by [GitHub Copilot CLI](https://g
 - 🏷️ **Tagging** — add, remove, and filter sessions by custom tags
 - ✦ **Skills management** — browse, create, edit, duplicate, delete, and search your Copilot CLI skills (`~/.copilot/skills/`). View rendered markdown with Tron-themed styling, toggle skills on/off, rename folders, import from files or folders, and export as zip archives. Tag skills with custom labels and filter by tags
 - ◈ **MCP server dashboard** — view all installed Model Context Protocol servers (local stdio and remote HTTP), enable/disable servers to manage context window bloat, browse their full tool catalogues grouped by category with descriptions and parameter schemas (queried live via JSON-RPC `tools/list`), see environment variables (with secret masking), connection times, and command details
+- ◎ **Agents panel** — view built-in Copilot agents (Research, Code Review, Coding) alongside your custom agents from `~/.copilot/agents/`. See session counts, usage stats, and linked session history per agent. Custom agents display with an orange CUSTOM badge, rendered markdown file viewer with Tron-themed styling, and file tabs for multi-file agents. Session lists default to the 5 most recent with a "show all" toggle for performance
 - ✏️ **Rename sessions** — give sessions a meaningful name beyond the auto-generated summary
 - 🗑️ **Archive / Delete** — safely archive or permanently remove old sessions (guards against deleting active sessions)
 - 📂 **Open in folder** — reveal research reports and modified files in Finder (macOS) or Explorer (Windows)
@@ -55,6 +56,10 @@ GridWatch reads the local session data written by [GitHub Copilot CLI](https://g
 ### MCP Servers
 
 ![MCP Servers](public/images/screenshot-mcp.png)
+
+### Agents
+
+<!-- TODO: Add screenshot — public/images/screenshot-agents.png -->
 
 ### Activity
 
@@ -146,12 +151,14 @@ gridwatch/
 │   │   ├── ActivityPage.tsx    # Heatmap + activity analytics
 │   │   ├── SkillsPage.tsx      # Copilot skills browser and editor
 │   │   ├── McpPage.tsx         # MCP server dashboard + tool catalogue
+│   │   ├── AgentsPage.tsx      # Built-in + custom agents with session linking
 │   │   ├── InsightsPage.tsx    # AI-powered prompt feedback
 │   │   ├── TransferPage.tsx    # Session context transfer
 │   │   └── SettingsPage.tsx    # UI scale / font / density controls
 │   ├── types/
 │   │   ├── session.ts          # SessionData and related interfaces
 │   │   ├── skill.ts            # SkillData and SkillFile interfaces
+│   │   ├── agent.ts            # CustomAgentData interface
 │   │   ├── mcp.ts              # McpServerData and McpEnvVar interfaces
 │   │   └── global.d.ts         # Window.gridwatchAPI type declarations
 │   ├── App.tsx                 # Shell layout, sidebar nav, auto-refresh
@@ -193,6 +200,7 @@ GridWatch reads exclusively from local files — no network requests are made ex
 | MCP server config          | `~/.copilot/mcp-config.json` (local MCP server definitions, read/write for enable/disable toggle)                                                        |
 | Disabled MCP servers       | `~/.copilot/gridwatch-mcp-disabled.json` (written by GridWatch when servers are toggled off)                                                             |
 | MCP tool discovery         | MCP servers queried directly via JSON-RPC `tools/list` (spawns each local server briefly); results cached to `~/.copilot/gridwatch-mcp-tools-cache.json` |
+| Custom agent profiles      | `~/.copilot/agents/<name>.agent.md` (read-only — agent profiles with YAML frontmatter)                                                                       |
 | Disabled skills            | `~/.copilot/skills-disabled/<name>/` (moved here when toggled off)                                                                                       |
 | Encrypted API token        | `~/.copilot/gridwatch-token.enc` (encrypted via OS keychain)                                                                                             |
 | Update check               | `api.github.com/repos/faesel/gridwatch/releases/latest` (on startup only)                                                                                |

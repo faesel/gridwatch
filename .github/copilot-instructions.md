@@ -47,6 +47,7 @@ Renderer (src/)
 | `~/.copilot/skills/<name>/gridwatch.json` | `{ "tags": ["tag1", "tag2"] }` — skill tags, same format as session tags |
 | `~/.copilot/skills-disabled/<name>/` | Skills moved here when disabled via GridWatch toggle |
 | `~/.copilot/gridwatch-mcp-tools-cache.json` | Disk-persisted cache of MCP tool lists queried via JSON-RPC `tools/list` |
+| `~/.copilot/agents/<name>.agent.md` | Custom agent profiles with YAML frontmatter (read-only) |
 | `localStorage` (renderer) | `gridwatch-settings` — zoom, fontSize, spacing |
 
 ---
@@ -74,6 +75,7 @@ gridwatch/
 │   ├── types/
 │   │   ├── session.ts            ← SessionData, TokenDataPoint, CompactionEvent, RewindSnapshot interfaces
 │   │   ├── skill.ts              ← SkillData, SkillFile interfaces
+│   │   ├── agent.ts              ← CustomAgentData interface
 │   │   ├── mcp.ts                ← McpServerData, McpTool, McpEnvVar interfaces
 │   │   └── global.d.ts          ← Window.gridwatchAPI declarations
 │   ├── App.tsx                   ← shell, sidebar (sidebarTop/sidebarBottom), auto-refresh, PageErrorBoundary
@@ -133,6 +135,17 @@ gridwatch/
 
 **MCP tool discovery:** Local servers are spawned briefly and queried via JSON-RPC `initialize` + `tools/list` to get canonical tool names, descriptions, and input schemas. Results are cached to `~/.copilot/gridwatch-mcp-tools-cache.json` (5 min in-memory TTL, persistent on disk). Remote/IDE servers fall back to log-based tool name extraction (no descriptions).
 
+### Agents IPC
+
+| Method | IPC channel | Description |
+|---|---|---|
+| `getCustomAgents()` | `agents:get-all` | Scans `~/.copilot/agents/` for `*.agent.md` files, returns `CustomAgentData[]` |
+| `getAgentFile(name, file)` | `agents:get-file` | Reads a single agent profile file (path-traversal protected) |
+
+**Agent discovery:** Scans `~/.copilot/agents/` for files matching `*.agent.md`. Parses YAML frontmatter for `name` and `description`. The agent ID is derived from the filename (e.g., `security-reviewer.agent.md` → `security-reviewer`).
+
+**Session linking:** Sessions are linked to custom agents by matching `agent_type` values extracted from `events.jsonl` against the agent's name and display name (case-insensitive).
+
 ---
 
 ## SkillData type
@@ -187,6 +200,21 @@ interface McpServerData {
 
 ---
 
+## CustomAgentData type
+
+```typescript
+interface CustomAgentData {
+  name: string              // derived from filename (e.g. "security-reviewer")
+  displayName: string       // from YAML frontmatter `name`
+  description: string       // from YAML frontmatter `description`
+  files: { name: string; path: string; size: number; modifiedAt: string }[]
+  createdAt: string         // file stat birthtime
+  modifiedAt: string        // file stat mtime
+}
+```
+
+---
+
 ## SessionData type
 
 ```typescript
@@ -215,6 +243,7 @@ interface SessionData {
   compactions: CompactionEvent[]  // parsed from CompactionProcessor log lines
   isResearch: boolean             // true if first user.message starts with "Researching: "
   isReview: boolean               // true if events.jsonl contains "agent_type":"code-review"
+  agentTypes: string[]            // all agent_type values found in events.jsonl (e.g. ["explore", "security-reviewer"])
   researchReports: string[]       // full paths to markdown reports in session's research/ dir
 }
 
