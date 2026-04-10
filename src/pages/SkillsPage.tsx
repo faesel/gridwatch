@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import type { SkillData } from '../types/skill'
+import TagInput from '../components/TagInput'
 import styles from './SkillsPage.module.css'
 
 // Strip YAML frontmatter before rendering markdown
@@ -31,7 +32,6 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
 
   // Tag state
   const [localTags, setLocalTags] = useState<string[]>([])
-  const [tagInput, setTagInput] = useState('')
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
   const [showTagFilter, setShowTagFilter] = useState(false)
 
@@ -78,7 +78,6 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
   // Sync local tags when selected skill changes
   useEffect(() => {
     setLocalTags(selected?.tags ?? [])
-    setTagInput('')
   }, [selected?.name])
 
   const addTag = async (tag: string) => {
@@ -409,18 +408,10 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
                   >×</button>
                 </span>
               ))}
-              <input
-                className={styles.tagInput}
-                placeholder="+ add tag"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ',') {
-                    e.preventDefault()
-                    addTag(tagInput)
-                    setTagInput('')
-                  }
-                }}
+              <TagInput
+                currentTags={localTags}
+                allTags={allTags}
+                onAdd={(tag) => { addTag(tag) }}
               />
             </div>
           </div>

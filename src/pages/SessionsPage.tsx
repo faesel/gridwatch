@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
 import type { SessionSummary, SessionDetail } from '../types/session'
+import TagInput from '../components/TagInput'
 import styles from './SessionsPage.module.css'
 
 const PAGE_SIZE = 20
@@ -75,7 +76,6 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
   const [renameValue, setRenameValue] = useState('')
   const [confirm, setConfirm] = useState<'archive' | 'delete' | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
-  const [tagInput, setTagInput] = useState('')
   const [localTags, setLocalTags] = useState<string[]>([])
   const [localNotes, setLocalNotes] = useState('')
   const notesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -121,7 +121,6 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
   useEffect(() => {
     setLocalTags(selectedSession?.tags ?? [])
     setLocalNotes(selectedSession?.notes ?? '')
-    setTagInput('')
     setTransfers([])
     setExpandedTransfer(null)
     setTransferContent(null)
@@ -588,18 +587,10 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
                   >×</button>
                 </span>
               ))}
-              <input
-                className={styles.tagInput}
-                placeholder="+ add tag"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ',') {
-                    e.preventDefault()
-                    addTag(tagInput)
-                    setTagInput('')
-                  }
-                }}
+              <TagInput
+                currentTags={localTags}
+                allTags={allTags}
+                onAdd={(tag) => { addTag(tag) }}
               />
             </div>
           </div>
