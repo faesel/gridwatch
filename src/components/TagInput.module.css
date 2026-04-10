@@ -1,0 +1,60 @@
+.wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--tron-cyan) 20%, transparent);
+  color: var(--tron-text);
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  outline: none;
+  padding: 2px 4px;
+  width: 100px;
+}
+
+.input::placeholder {
+  color: var(--tron-text-dim);
+}
+
+.input:focus {
+  border-bottom-color: var(--tron-cyan);
+}
+
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 200;
+  min-width: 130px;
+  max-height: 180px;
+  overflow-y: auto;
+  background: var(--tron-panel);
+  border: 1px solid color-mix(in srgb, var(--tron-cyan) 35%, transparent);
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 2px 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.option {
+  padding: 5px 10px;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 0.5px;
+  color: var(--tron-text);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.option:hover {
+  background: color-mix(in srgb, var(--tron-cyan) 12%, transparent);
+  color: var(--tron-cyan);
+}
+
+.optionActive {
+  background: color-mix(in srgb, var(--tron-cyan) 18%, transparent);
+  color: var(--tron-cyan);
+}
