@@ -44,8 +44,8 @@ declare global {
       openExternal: (url: string) => Promise<void>;
       showInFolder: (filePath: string) => Promise<void>;
       saveToken: (token: string) => Promise<boolean>;
-      loadToken: () => Promise<string>;
-      analyseSession: (apiKey: string, messages: string[]) => Promise<InsightResult>;
+      hasToken: () => Promise<boolean>;
+      analyseSession: (messages: string[]) => Promise<InsightResult>;
 
       // Skills
       getSkills: () => Promise<SkillData[]>;

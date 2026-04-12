@@ -214,7 +214,12 @@ GridWatch reads exclusively from local files — no network requests are made ex
 - **Encrypted secrets** — GitHub PAT encrypted at rest via Electron `safeStorage` (macOS Keychain / Windows DPAPI), scoped to GridWatch's own app identity only
 - **URL restriction** — `shell.openExternal` limited to HTTP(S) URLs only
 - **Navigation guards** — `will-navigate` and `setWindowOpenHandler` prevent the Electron window from being redirected to external origins
+- **Token isolation** — the GitHub PAT never leaves the main process. The renderer only knows whether a token exists (`hasToken`); API calls that require authentication are made entirely within main, keeping the token out of the renderer's JavaScript heap
+- **Input size limits** — freeform IPC inputs are capped to prevent a renderer bug from writing unbounded data to disk. Session summaries are limited to 1,000 characters, session notes to 100,000 characters, and skill file content to 512KB. Skill filenames are restricted to `.md` extensions only
+- **HTTP response caps** — outbound HTTP responses (update checks, GitHub Models API) are capped at 1MB. If a response exceeds this limit, the stream is destroyed immediately. This prevents a compromised or misbehaving endpoint from exhausting main process memory
 - **MCP tool discovery** — GridWatch reads your `~/.copilot/mcp-config.json` and briefly spawns each configured local MCP server to query its tool list via JSON-RPC. GridWatch does not install or modify MCP servers — it only reads what you have already configured. Commands with shell metacharacters are rejected as a safety measure
+- **Prototype pollution guards** — object property keys sourced from external config (e.g. MCP server names) are validated against known dangerous keys (`__proto__`, `constructor`, `prototype`) and use `hasOwnProperty` checks to prevent prototype chain corruption
+- **Dev build guard** — packaged builds detect and refuse to run if a Vite dev server URL is present, preventing accidental distribution of builds with a relaxed Content Security Policy
 - **Hardened runtime** — macOS builds use hardened runtime for notarization compatibility
 
 ### ⚙️ Tech stack

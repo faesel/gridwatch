@@ -31,9 +31,9 @@ contextBridge.exposeInMainWorld('gridwatchAPI', {
   openExternal: (url: string) => ipcRenderer.invoke('app:open-external', url),
   showInFolder: (filePath: string) => ipcRenderer.invoke('app:show-in-folder', filePath),
   saveToken: (token: string) => ipcRenderer.invoke('app:save-token', token),
-  loadToken: () => ipcRenderer.invoke('app:load-token'),
-  analyseSession: (apiKey: string, messages: string[]) =>
-    ipcRenderer.invoke('insights:analyse', apiKey, messages),
+  hasToken: () => ipcRenderer.invoke('app:has-token'),
+  analyseSession: (messages: string[]) =>
+    ipcRenderer.invoke('insights:analyse', messages),
 
   // Skills
   getSkills: () => ipcRenderer.invoke('skills:get-all'),

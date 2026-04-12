@@ -17,11 +17,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 const STORAGE_KEY = 'gridwatch-settings'
 
-export async function loadApiKey(): Promise<string> {
-  try { return await window.gridwatchAPI.loadToken() } catch { return '' }
-}
-
-export async function saveApiKey(key: string): Promise<void> {
+async function saveApiKey(key: string): Promise<void> {
   try { await window.gridwatchAPI.saveToken(key) } catch { /* ignore */ }
 }
 
@@ -81,10 +77,10 @@ interface Props {
 }
 
 function SettingsPage({ settings, onChange }: Props) {
-  const [apiKey, setApiKey] = useState('')
-  const [showKey, setShowKey] = useState(false)
+  const [tokenInput, setTokenInput] = useState('')
+  const [hasToken, setHasToken] = useState(false)
 
-  useEffect(() => { loadApiKey().then(setApiKey) }, [])
+  useEffect(() => { window.gridwatchAPI.hasToken().then(setHasToken) }, [])
 
   const update = (patch: Partial<AppSettings>) => {
     const next = { ...settings, ...patch }
@@ -198,33 +194,37 @@ function SettingsPage({ settings, onChange }: Props) {
         <div className={styles.apiKeyRow}>
           <input
             className={styles.apiKeyInput}
-            type={showKey ? 'text' : 'password'}
-            placeholder="ghp_..."
-            value={apiKey}
-            onChange={(e) => {
-              setApiKey(e.target.value)
-              saveApiKey(e.target.value)
+            type="password"
+            placeholder={hasToken ? '••••••••••••••••' : 'ghp_...'}
+            value={tokenInput}
+            onChange={(e) => setTokenInput(e.target.value)}
+            onBlur={() => {
+              if (tokenInput) {
+                saveApiKey(tokenInput)
+                setTokenInput('')
+                setHasToken(true)
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && tokenInput) {
+                saveApiKey(tokenInput)
+                setTokenInput('')
+                setHasToken(true)
+              }
             }}
             spellCheck={false}
             autoComplete="off"
           />
-          <button
-            className={styles.apiKeyToggle}
-            onClick={() => setShowKey((v) => !v)}
-            aria-label={showKey ? 'Hide key' : 'Show key'}
-          >
-            {showKey ? '◉' : '◎'}
-          </button>
-          {apiKey && (
+          {hasToken && (
             <button
               className={styles.apiKeyClear}
-              onClick={() => { setApiKey(''); saveApiKey('') }}
+              onClick={() => { saveApiKey(''); setHasToken(false); setTokenInput('') }}
             >
               CLEAR
             </button>
           )}
         </div>
-        {apiKey && <div className={styles.apiKeyStatus}>✓ TOKEN SAVED</div>}
+        {hasToken && <div className={styles.apiKeyStatus}>✓ TOKEN SAVED</div>}
       </div>
 
       {/* Reset */}

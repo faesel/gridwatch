@@ -1,6 +1,5 @@
 import { useState, memo } from 'react'
 import type { SessionSummary, UserMessage } from '../types/session'
-import { loadApiKey } from './SettingsPage'
 import SessionPicker from '../components/SessionPicker'
 import styles from './TransferPage.module.css'
 
@@ -107,8 +106,8 @@ function TransferPage({ sessions }: Props) {
 
   const generateAndTransfer = async () => {
     if (!source || !target || !context) return
-    const apiKey = await loadApiKey()
-    if (!apiKey) {
+    const hasKey = await window.gridwatchAPI.hasToken()
+    if (!hasKey) {
       setError('No GitHub token set. Go to Settings → GitHub Personal Access Token to add one.')
       return
     }
@@ -125,7 +124,7 @@ function TransferPage({ sessions }: Props) {
     if (context.notes) sourceText.push(`Notes:\n${context.notes}`)
 
     try {
-      const res = await window.gridwatchAPI.analyseSession(apiKey, [
+      const res = await window.gridwatchAPI.analyseSession([
         `You are a session context summariser. Condense the following Copilot CLI session context into a clear, actionable brief that can prime a new session. Focus on: what was being built, key decisions made, current state, and next steps. Output as markdown.\n\n${sourceText.join('\n\n---\n\n')}`,
       ])
       // The analyse endpoint returns InsightResult, but we sent a custom prompt

@@ -1,7 +1,6 @@
 import { useState, memo } from 'react'
 import type { SessionSummary, UserMessage } from '../types/session'
 import type { InsightResult } from '../types/global'
-import { loadApiKey } from './SettingsPage'
 import SessionPicker from '../components/SessionPicker'
 import styles from './InsightsPage.module.css'
 
@@ -53,8 +52,8 @@ function InsightsPage({ sessions }: Props) {
 
   const analyse = async () => {
     if (!selected || userMessages.length === 0) return
-    const apiKey = await loadApiKey()
-    if (!apiKey) {
+    const hasKey = await window.gridwatchAPI.hasToken()
+    if (!hasKey) {
       setError('No GitHub token set. Go to Settings → GitHub Personal Access Token to add one.')
       return
     }
@@ -64,7 +63,7 @@ function InsightsPage({ sessions }: Props) {
     setResult(null)
 
     try {
-      const res = await window.gridwatchAPI.analyseSession(apiKey, userMessages.map(m => m.content))
+      const res = await window.gridwatchAPI.analyseSession(userMessages.map(m => m.content))
       setResult(res)
     } catch (err) {
       setError((err as Error).message || 'Analysis failed')

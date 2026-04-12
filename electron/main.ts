@@ -34,6 +34,15 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, 'public')
   : RENDERER_DIST
 
+// Guard: refuse to run with dev CSP in a packaged build
+if (VITE_DEV_SERVER_URL && app.isPackaged) {
+  dialog.showErrorBox(
+    'GridWatch — Configuration Error',
+    'This packaged build is incorrectly configured with a dev server URL. Please reinstall from an official release.',
+  )
+  app.quit()
+}
+
 let win: BrowserWindow | null
 
 function createWindow() {
@@ -70,7 +79,7 @@ function createWindow() {
     })
   })
 
-  // Prevent navigation to external origins (Security Audit #2)
+  // Prevent navigation to external origins
   win.webContents.on('will-navigate', (event, navigationUrl) => {
     try {
       const parsed = new URL(navigationUrl)
@@ -650,9 +659,9 @@ ipcMain.handle('sessions:rename', async (_event, sessionId: string, newSummary: 
     const yamlPath = path.join(sessionDir, 'workspace.yaml')
     if (!fs.existsSync(yamlPath)) return false
 
-    // Sanitise newlines to prevent YAML key injection (Security Audit #1)
+    // Sanitise newlines to prevent YAML key injection
     const safeSummary = newSummary.replace(/[\r\n]+/g, ' ').trim()
-    if (!safeSummary) return false
+    if (!safeSummary || safeSummary.length > 1000) return false
 
     const raw = fs.readFileSync(yamlPath, 'utf-8')
     let updated: string
@@ -756,6 +765,7 @@ ipcMain.handle('sessions:set-notes', async (_e, sessionId: string, notes: string
   invalidateSessionsCache()
   try {
     if (!isValidSessionId(sessionId)) return false
+    const safeNotes = typeof notes === 'string' ? notes.slice(0, 100_000) : ''
     const sessionDir = path.join(os.homedir(), '.copilot', 'session-state', sessionId)
     if (!fs.existsSync(sessionDir)) return false
     const metaFile = path.join(sessionDir, 'gridwatch.json')
@@ -763,7 +773,7 @@ ipcMain.handle('sessions:set-notes', async (_e, sessionId: string, notes: string
     if (fs.existsSync(metaFile)) {
       try { existing = JSON.parse(fs.readFileSync(metaFile, 'utf-8')) } catch { /* ignore */ }
     }
-    fs.writeFileSync(metaFile, JSON.stringify({ ...existing, notes }, null, 2), 'utf-8')
+    fs.writeFileSync(metaFile, JSON.stringify({ ...existing, notes: safeNotes }, null, 2), 'utf-8')
     return true
   } catch {
     return false
@@ -899,7 +909,10 @@ function checkForUpdate(): Promise<{ hasUpdate: boolean; latestVersion?: string;
 
     https.get(options, (res) => {
       let data = ''
-      res.on('data', (chunk: Buffer) => { data += chunk.toString() })
+      res.on('data', (chunk: Buffer) => {
+        data += chunk.toString()
+        if (data.length > MAX_TRANSFER_SIZE) { res.destroy(); resolve({ hasUpdate: false }) }
+      })
       res.on('end', () => {
         try {
           const release = JSON.parse(data)
@@ -993,6 +1006,14 @@ ipcMain.handle('app:load-token', async (): Promise<string> => {
   }
 })
 
+ipcMain.handle('app:has-token', async (): Promise<boolean> => {
+  try {
+    return safeStorage.isEncryptionAvailable() && fs.existsSync(TOKEN_FILE)
+  } catch {
+    return false
+  }
+})
+
 // ── IPC: insights:analyse ──────────────────────────────────────────────────
 
 const INSIGHTS_SYSTEM_PROMPT = `You are an expert prompt engineering coach. You analyse prompts sent to GitHub Copilot CLI and provide actionable feedback.
@@ -1027,7 +1048,16 @@ Keep feedback concise and actionable. Max 5 suggestions.`
 
 ipcMain.handle(
   'insights:analyse',
-  async (_e, token: string, messages: string[]) => {
+  async (_e, messages: string[]) => {
+    // Read token internally — never exposed to renderer
+    let token = ''
+    try {
+      if (safeStorage.isEncryptionAvailable() && fs.existsSync(TOKEN_FILE)) {
+        token = safeStorage.decryptString(fs.readFileSync(TOKEN_FILE))
+      }
+    } catch { /* ignore */ }
+    if (!token) throw new Error('No GitHub token configured')
+
     // Truncate each message and cap total to fit within ~6K tokens (leaving room for system prompt + response)
     const MAX_MSGS = 30
     const MAX_CHARS_PER_MSG = 300
@@ -1064,7 +1094,10 @@ ipcMain.handle(
         },
         (res) => {
           let data = ''
-          res.on('data', (chunk: Buffer) => { data += chunk.toString() })
+          res.on('data', (chunk: Buffer) => {
+            data += chunk.toString()
+            if (data.length > MAX_TRANSFER_SIZE) { res.destroy(); reject(new Error('Response too large')) }
+          })
           res.on('end', () => {
             try {
               const json = JSON.parse(data)
@@ -1205,6 +1238,7 @@ ipcMain.handle('skills:get-file', async (_e, skillName: string, fileName: string
 
 ipcMain.handle('skills:save-file', async (_e, skillName: string, fileName: string, content: string): Promise<boolean> => {
   if (!isValidSkillName(skillName) || !fileName || typeof content !== 'string') return false
+  if (!fileName.endsWith('.md') || content.length > 524_288) return false
   const enabledDir = path.join(os.homedir(), '.copilot', 'skills')
   const disabledDir = path.join(os.homedir(), '.copilot', 'skills-disabled')
 
@@ -1226,7 +1260,8 @@ ipcMain.handle('skills:create', async (_e, name: string, description: string): P
   const disabledDir = path.join(os.homedir(), '.copilot', 'skills-disabled', name)
   if (fs.existsSync(disabledDir)) return { ok: false, error: 'A disabled skill with this name already exists.' }
 
-  const template = `---\nname: ${name}\ndescription: ${description || 'TODO: Add a description'}\n---\n\n# ${name}\n\nAdd your skill instructions here.\n`
+  const safeDescription = (description || 'TODO: Add a description').replace(/[\r\n]+/g, ' ').trim()
+  const template = `---\nname: ${name}\ndescription: ${safeDescription}\n---\n\n# ${name}\n\nAdd your skill instructions here.\n`
 
   try {
     fs.mkdirSync(skillDir, { recursive: true })
@@ -1479,7 +1514,7 @@ function queryMcpTools(command: string, args: string[], env: Record<string, stri
   return new Promise((resolve) => {
     const { spawn } = require('child_process') as typeof import('child_process')
 
-    // Reject commands containing shell metacharacters (Security Audit #3)
+    // Reject commands containing shell metacharacters
     if (!command || !command.trim() || SHELL_METACHAR_PATTERN.test(command)) {
       return resolve([])
     }
@@ -1711,8 +1746,14 @@ ipcMain.handle('mcp:show-config', async () => {
   }
 })
 
+const PROTOTYPE_POLLUTION_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+
 ipcMain.handle('mcp:toggle-server', async (_e, serverName: string): Promise<{ ok: boolean; enabled: boolean; error?: string }> => {
   try {
+    if (typeof serverName !== 'string' || !serverName || PROTOTYPE_POLLUTION_KEYS.has(serverName)) {
+      return { ok: false, enabled: false, error: 'Invalid server name' }
+    }
+
     // Read current config
     const configRaw = fs.existsSync(mcpConfigPath) ? fs.readFileSync(mcpConfigPath, 'utf-8') : '{}'
     const config = JSON.parse(configRaw)
@@ -1723,7 +1764,7 @@ ipcMain.handle('mcp:toggle-server', async (_e, serverName: string): Promise<{ ok
     const disabledRaw = fs.existsSync(mcpDisabledPath) ? fs.readFileSync(mcpDisabledPath, 'utf-8') : '{}'
     const disabled: Record<string, unknown> = JSON.parse(disabledRaw)
 
-    if (serverName in mcpServers) {
+    if (Object.prototype.hasOwnProperty.call(mcpServers, serverName)) {
       // Disable: move from config to disabled store
       disabled[serverName] = mcpServers[serverName]
       delete mcpServers[serverName]
@@ -1734,7 +1775,7 @@ ipcMain.handle('mcp:toggle-server', async (_e, serverName: string): Promise<{ ok
       mcpToolsCache.delete(serverName)
       saveToolsCacheToDisk()
       return { ok: true, enabled: false }
-    } else if (serverName in disabled) {
+    } else if (Object.prototype.hasOwnProperty.call(disabled, serverName)) {
       // Enable: move from disabled store back to config
       mcpServers[serverName] = disabled[serverName]
       delete disabled[serverName]
