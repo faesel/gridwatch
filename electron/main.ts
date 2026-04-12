@@ -70,6 +70,25 @@ function createWindow() {
     })
   })
 
+  // Prevent navigation to external origins (Security Audit #2)
+  win.webContents.on('will-navigate', (event, navigationUrl) => {
+    try {
+      const parsed = new URL(navigationUrl)
+      const allowedHosts = VITE_DEV_SERVER_URL ? [new URL(VITE_DEV_SERVER_URL).host] : []
+      if (parsed.protocol !== 'file:' && !allowedHosts.includes(parsed.host)) {
+        event.preventDefault()
+      }
+    } catch {
+      event.preventDefault()
+    }
+  })
+
+  // Block new window creation; open external links in the default browser
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('https://')) shell.openExternal(url)
+    return { action: 'deny' }
+  })
+
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
     if (process.env.GRIDWATCH_DEVTOOLS === '1') {
@@ -631,12 +650,16 @@ ipcMain.handle('sessions:rename', async (_event, sessionId: string, newSummary: 
     const yamlPath = path.join(sessionDir, 'workspace.yaml')
     if (!fs.existsSync(yamlPath)) return false
 
+    // Sanitise newlines to prevent YAML key injection (Security Audit #1)
+    const safeSummary = newSummary.replace(/[\r\n]+/g, ' ').trim()
+    if (!safeSummary) return false
+
     const raw = fs.readFileSync(yamlPath, 'utf-8')
     let updated: string
     if (/^summary:.*$/m.test(raw)) {
-      updated = raw.replace(/^summary:.*$/m, `summary: ${newSummary}`)
+      updated = raw.replace(/^summary:.*$/m, `summary: ${safeSummary}`)
     } else {
-      updated = raw.trimEnd() + `\nsummary: ${newSummary}\n`
+      updated = raw.trimEnd() + `\nsummary: ${safeSummary}\n`
     }
     fs.writeFileSync(yamlPath, updated, 'utf-8')
     return true
@@ -1448,10 +1471,18 @@ function saveToolsCacheToDisk(): void {
 // Track whether a background refresh is already in progress
 let mcpToolsRefreshing = false
 
+// Shell metacharacters that have no legitimate use in a binary path
+const SHELL_METACHAR_PATTERN = /[;|&`$()><]/
+
 /** Spawn an MCP server and query its tool list via JSON-RPC over stdio */
 function queryMcpTools(command: string, args: string[], env: Record<string, string>, timeoutMs = 15_000): Promise<McpTool[]> {
   return new Promise((resolve) => {
     const { spawn } = require('child_process') as typeof import('child_process')
+
+    // Reject commands containing shell metacharacters (Security Audit #3)
+    if (!command || !command.trim() || SHELL_METACHAR_PATTERN.test(command)) {
+      return resolve([])
+    }
 
     // Resolve ${VAR} env references from process.env
     const resolvedEnv: Record<string, string | undefined> = { ...process.env }

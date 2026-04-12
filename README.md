@@ -213,6 +213,8 @@ GridWatch reads exclusively from local files — no network requests are made ex
 - **Input validation** — all IPC handlers validate session IDs (UUID format) and file paths (traversal protection)
 - **Encrypted secrets** — GitHub PAT encrypted at rest via Electron `safeStorage` (macOS Keychain / Windows DPAPI), scoped to GridWatch's own app identity only
 - **URL restriction** — `shell.openExternal` limited to HTTP(S) URLs only
+- **Navigation guards** — `will-navigate` and `setWindowOpenHandler` prevent the Electron window from being redirected to external origins
+- **MCP tool discovery** — GridWatch reads your `~/.copilot/mcp-config.json` and briefly spawns each configured local MCP server to query its tool list via JSON-RPC. GridWatch does not install or modify MCP servers — it only reads what you have already configured. Commands with shell metacharacters are rejected as a safety measure
 - **Hardened runtime** — macOS builds use hardened runtime for notarization compatibility
 
 ### ⚙️ Tech stack
