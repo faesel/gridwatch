@@ -156,6 +156,7 @@ gridwatch/
 │   │   ├── ActivityPage.tsx    # Heatmap + activity analytics
 │   │   ├── SkillsPage.tsx      # Copilot skills browser and editor
 │   │   ├── McpPage.tsx         # MCP server dashboard + tool catalogue
+│   │   ├── LspPage.tsx         # LSP server dashboard + enable/disable
 │   │   ├── AgentsPage.tsx      # Built-in + custom agents with session linking
 │   │   ├── InsightsPage.tsx    # AI-powered prompt feedback
 │   │   ├── TransferPage.tsx    # Session context transfer
@@ -165,6 +166,7 @@ gridwatch/
 │   │   ├── skill.ts            # SkillData and SkillFile interfaces
 │   │   ├── agent.ts            # CustomAgentData interface
 │   │   ├── mcp.ts              # McpServerData and McpEnvVar interfaces
+│   │   ├── lsp.ts              # LspServerData interface
 │   │   └── global.d.ts         # Window.gridwatchAPI type declarations
 │   ├── App.tsx                 # Shell layout, sidebar nav, auto-refresh
 │   └── index.css               # Global styles + Tron design system variables
@@ -206,6 +208,8 @@ GridWatch reads exclusively from local files — no network requests are made ex
 | Disabled MCP servers       | `~/.copilot/gridwatch-mcp-disabled.json` (written by GridWatch when servers are toggled off)                                                             |
 | MCP tool discovery         | MCP servers queried directly via JSON-RPC `tools/list` (spawns each local server briefly); results cached to `~/.copilot/gridwatch-mcp-tools-cache.json` |
 | Custom agent profiles      | `~/.copilot/agents/<name>.agent.md` (read-only — agent profiles with YAML frontmatter)                                                                       |
+| LSP server config          | `~/.copilot/lsp-config.json` (language server definitions, read/write for enable/disable toggle)                                                             |
+| Disabled LSP servers       | `~/.copilot/gridwatch-lsp-disabled.json` (written by GridWatch when servers are toggled off)                                                                 |
 | Disabled skills            | `~/.copilot/skills-disabled/<name>/` (moved here when toggled off)                                                                                       |
 | Encrypted API token        | `~/.copilot/gridwatch-token.enc` (encrypted via OS keychain)                                                                                             |
 | Update check               | `api.github.com/repos/faesel/gridwatch/releases/latest` (on startup only)                                                                                |
@@ -223,7 +227,8 @@ GridWatch reads exclusively from local files — no network requests are made ex
 - **Input size limits** — freeform IPC inputs are capped to prevent a renderer bug from writing unbounded data to disk. Session summaries are limited to 1,000 characters, session notes to 100,000 characters, and skill file content to 512KB. Skill filenames are restricted to `.md` extensions only
 - **HTTP response caps** — outbound HTTP responses (update checks, GitHub Models API) are capped at 1MB. If a response exceeds this limit, the stream is destroyed immediately. This prevents a compromised or misbehaving endpoint from exhausting main process memory
 - **MCP tool discovery** — GridWatch reads your `~/.copilot/mcp-config.json` and briefly spawns each configured local MCP server to query its tool list via JSON-RPC. GridWatch does not install or modify MCP servers — it only reads what you have already configured. Commands with shell metacharacters are rejected as a safety measure
-- **Prototype pollution guards** — object property keys sourced from external config (e.g. MCP server names) are validated against known dangerous keys (`__proto__`, `constructor`, `prototype`) and use `hasOwnProperty` checks to prevent prototype chain corruption
+- **Prototype pollution guards** — object property keys sourced from external config (e.g. MCP server names, LSP server names) are validated against known dangerous keys (`__proto__`, `constructor`, `prototype`) and use `hasOwnProperty` checks to prevent prototype chain corruption
+- **LSP config management** — GridWatch reads and writes `~/.copilot/lsp-config.json` to enable/disable language servers but never spawns or executes LSP server processes. Toggle operations use the same prototype pollution guards and `hasOwnProperty` checks as MCP
 - **Dev build guard** — packaged builds detect and refuse to run if a Vite dev server URL is present, preventing accidental distribution of builds with a relaxed Content Security Policy
 - **Hardened runtime** — macOS builds use hardened runtime for notarization compatibility
 
