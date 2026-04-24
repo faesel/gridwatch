@@ -3,6 +3,7 @@ import type { SkillData } from './skill';
 import type { McpServerData } from './mcp';
 import type { CustomAgentData } from './agent';
 import type { LspServerData } from './lsp';
+import type { AllowedDirectory } from './dirs';
 
 export interface PromptFeedback {
   prompt: string;
@@ -74,6 +75,11 @@ declare global {
       // Agents
       getCustomAgents: () => Promise<CustomAgentData[]>;
       getAgentFile: (agentName: string, fileName: string) => Promise<string | null>;
+
+      // Allowed Directories
+      getAllowedDirs: () => Promise<AllowedDirectory[]>;
+      addAllowedDir: () => Promise<{ ok: boolean; directory?: AllowedDirectory; error?: string }>;
+      removeAllowedDir: (dirPath: string) => Promise<{ ok: boolean; error?: string }>;
 
       // Window controls
       getPlatform: () => Promise<string>;

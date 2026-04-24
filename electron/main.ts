@@ -10,6 +10,7 @@ import type { SkillData, SkillFile } from '../src/types/skill'
 import type { CustomAgentData } from '../src/types/agent'
 import type { McpServerData, McpEnvVar, McpTool } from '../src/types/mcp'
 import type { LspServerData } from '../src/types/lsp'
+import type { AllowedDirectory } from '../src/types/dirs'
 
 // Must be set before app is ready so the OS picks it up for dock/taskbar tooltip
 app.setName('GridWatch')
@@ -977,11 +978,14 @@ ipcMain.handle('app:open-item-folder', async (_e, type: string, name: string) =>
     case 'agent':
       target = path.join(copilotBase, 'agents', `${name}.agent.md`)
       break
+    case 'dirs':
+      target = allowedDirsPath
+      break
     default:
       throw new Error(`Unknown item type: ${type}`)
   }
   if (!isPathWithin(target, copilotBase)) throw new Error('Path outside allowed directory')
-  if (type === 'mcp' || type === 'agent' || type === 'lsp') {
+  if (type === 'mcp' || type === 'agent' || type === 'lsp' || type === 'dirs') {
     shell.showItemInFolder(target)
   } else {
     const err = await shell.openPath(target)
@@ -1994,5 +1998,138 @@ ipcMain.handle('lsp:toggle-server', async (_e, serverName: string): Promise<{ ok
     return { ok: false, enabled: false, error: 'Server not found' }
   } catch (err) {
     return { ok: false, enabled: false, error: (err as Error).message }
+  }
+})
+
+// ── Allowed Directories IPC ──────────────────────────────────────────────────
+
+const allowedDirsPath = path.join(os.homedir(), '.copilot', 'gridwatch-allowed-dirs.json')
+let allowedDirsCache: { data: AllowedDirectory[]; timestamp: number } | null = null
+const DIRS_CACHE_TTL = 10_000
+
+/** Max permitted length for a directory path string */
+const MAX_DIR_PATH_LENGTH = 4096
+
+/** Characters that must not appear in a managed directory path */
+const SHELL_METACHAR_IN_PATH = /[;|&`$()><\0]/
+
+function isValidDirPath(p: unknown): p is string {
+  if (typeof p !== 'string') return false
+  if (!p || p.length > MAX_DIR_PATH_LENGTH) return false
+  if (SHELL_METACHAR_IN_PATH.test(p)) return false
+  // Must be absolute
+  if (!path.isAbsolute(p)) return false
+  // Normalised path must equal itself (no ../ traversal after normalise)
+  if (path.normalize(p) !== p) return false
+  return true
+}
+
+function readAllowedDirs(): { path: string; addedAt: string }[] {
+  if (!fs.existsSync(allowedDirsPath)) return []
+  try {
+    const raw = fs.readFileSync(allowedDirsPath, 'utf-8')
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.directories)) return []
+    return parsed.directories.filter(
+      (d: unknown): d is { path: string; addedAt: string } =>
+        d !== null &&
+        typeof d === 'object' &&
+        typeof (d as Record<string, unknown>).path === 'string' &&
+        typeof (d as Record<string, unknown>).addedAt === 'string',
+    )
+  } catch {
+    return []
+  }
+}
+
+function writeAllowedDirs(dirs: { path: string; addedAt: string }[]): void {
+  fs.writeFileSync(allowedDirsPath, JSON.stringify({ directories: dirs }, null, 2) + '\n', 'utf-8')
+}
+
+ipcMain.handle('dirs:get-all', async (): Promise<AllowedDirectory[]> => {
+  if (allowedDirsCache && Date.now() - allowedDirsCache.timestamp < DIRS_CACHE_TTL) {
+    return allowedDirsCache.data
+  }
+  try {
+    const raw = readAllowedDirs()
+    const data: AllowedDirectory[] = raw.map((d) => ({
+      path: d.path,
+      addedAt: d.addedAt,
+      exists: fs.existsSync(d.path),
+    }))
+    allowedDirsCache = { data, timestamp: Date.now() }
+    return data
+  } catch {
+    return []
+  }
+})
+
+ipcMain.handle('dirs:add', async (): Promise<{ ok: boolean; directory?: AllowedDirectory; error?: string }> => {
+  if (!win) return { ok: false, error: 'No window available' }
+  try {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: 'Add Allowed Directory',
+      properties: ['openDirectory', 'createDirectory'],
+    })
+    if (canceled || !filePaths.length) return { ok: false, error: 'Cancelled' }
+
+    const selected = filePaths[0]
+
+    if (!isValidDirPath(selected)) {
+      return { ok: false, error: 'Invalid directory path' }
+    }
+    if (PROTOTYPE_POLLUTION_KEYS.has(selected)) {
+      return { ok: false, error: 'Invalid directory path' }
+    }
+    if (!fs.existsSync(selected)) {
+      return { ok: false, error: 'Directory does not exist' }
+    }
+    const stat = fs.statSync(selected)
+    if (!stat.isDirectory()) {
+      return { ok: false, error: 'Selected path is not a directory' }
+    }
+
+    const existing = readAllowedDirs()
+    if (existing.some((d) => d.path === selected)) {
+      return { ok: false, error: 'Directory is already in the allowed list' }
+    }
+
+    const entry = { path: selected, addedAt: new Date().toISOString() }
+    writeAllowedDirs([...existing, entry])
+    allowedDirsCache = null
+
+    return {
+      ok: true,
+      directory: { path: selected, addedAt: entry.addedAt, exists: true },
+    }
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('dirs:remove', async (_e, dirPath: string): Promise<{ ok: boolean; error?: string }> => {
+  try {
+    if (!isValidDirPath(dirPath)) {
+      return { ok: false, error: 'Invalid directory path' }
+    }
+    if (PROTOTYPE_POLLUTION_KEYS.has(dirPath)) {
+      return { ok: false, error: 'Invalid directory path' }
+    }
+
+    const existing = readAllowedDirs()
+    const next = existing.filter((d) => d.path !== dirPath)
+    if (next.length === existing.length) {
+      return { ok: false, error: 'Directory not found in allowed list' }
+    }
+
+    if (next.length === 0) {
+      if (fs.existsSync(allowedDirsPath)) fs.unlinkSync(allowedDirsPath)
+    } else {
+      writeAllowedDirs(next)
+    }
+    allowedDirsCache = null
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
   }
 })

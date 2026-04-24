@@ -14,6 +14,7 @@ import SkillsPage from './pages/SkillsPage'
 import McpPage from './pages/McpPage'
 import LspPage from './pages/LspPage'
 import AgentsPage from './pages/AgentsPage'
+import DirsPage from './pages/DirsPage'
 import type { AppSettings } from './pages/SettingsPage'
 
 // Error boundary to catch render errors in page components
@@ -50,6 +51,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'mcp', label: 'MCP', icon: '⧈' },
   { id: 'lsp', label: 'LSP', icon: '⬡' },
   { id: 'agents', label: 'AGENTS', icon: '◎' },
+  { id: 'dirs', label: 'DIRS', icon: '⊟' },
   { id: 'insights', label: 'INSIGHTS', icon: '⚡' },
   { id: 'transfer', label: 'TRANSFER', icon: '⇄' },
   { id: 'settings', label: 'SETTINGS', icon: '⚙' },
@@ -108,6 +110,7 @@ function App() {
       case 'mcp': return <McpPage refreshKey={refreshKey} />
       case 'lsp': return <LspPage refreshKey={refreshKey} />
       case 'agents': return <AgentsPage sessions={sessions} refreshKey={refreshKey} />
+      case 'dirs': return <DirsPage refreshKey={refreshKey} />
       case 'insights': return <InsightsPage sessions={sessions} />
       case 'transfer': return <TransferPage sessions={sessions} />
       case 'settings': return <SettingsPage settings={appSettings} onChange={setAppSettings} />
