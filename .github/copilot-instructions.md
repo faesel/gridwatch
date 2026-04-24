@@ -47,6 +47,7 @@ Renderer (src/)
 | `~/.copilot/skills/<name>/gridwatch.json` | `{ "tags": ["tag1", "tag2"] }` — skill tags, same format as session tags |
 | `~/.copilot/skills-disabled/<name>/` | Skills moved here when disabled via GridWatch toggle |
 | `~/.copilot/gridwatch-mcp-tools-cache.json` | Disk-persisted cache of MCP tool lists queried via JSON-RPC `tools/list` |
+| `~/.copilot/gridwatch-lsp-disabled.json` | LSP servers moved here when disabled via GridWatch toggle |
 | `~/.copilot/agents/<name>.agent.md` | Custom agent profiles with YAML frontmatter (read-only) |
 | `localStorage` (renderer) | `gridwatch-settings` — zoom, fontSize, spacing |
 
@@ -71,12 +72,14 @@ gridwatch/
 │   │   ├── TokensPage.tsx        ← token usage charts (line + bar + per-session table)
 │   │   ├── ActivityPage.tsx      ← heatmap, top repos, tool usage, day-of-week chart
 │   │   ├── SkillsPage.tsx        ← Copilot skills browser and editor (CRUD/import/export/toggle/tags)
+│   │   ├── LspPage.tsx          ← LSP server dashboard (view/enable/disable)
 │   │   └── SettingsPage.tsx      ← UI scale / font size / density; applySettings(), loadSettings()
 │   ├── types/
 │   │   ├── session.ts            ← SessionData, TokenDataPoint, CompactionEvent, RewindSnapshot interfaces
 │   │   ├── skill.ts              ← SkillData, SkillFile interfaces
 │   │   ├── agent.ts              ← CustomAgentData interface
 │   │   ├── mcp.ts                ← McpServerData, McpTool, McpEnvVar interfaces
+│   │   ├── lsp.ts                ← LspServerData interface
 │   │   └── global.d.ts          ← Window.gridwatchAPI declarations
 │   ├── App.tsx                   ← shell, sidebar (sidebarTop/sidebarBottom), auto-refresh, PageErrorBoundary
 │   ├── App.module.css
@@ -134,6 +137,15 @@ gridwatch/
 | `showMcpConfig()` | `mcp:show-config` | Reveals `mcp-config.json` in Finder/Explorer |
 
 **MCP tool discovery:** Local servers are spawned briefly and queried via JSON-RPC `initialize` + `tools/list` to get canonical tool names, descriptions, and input schemas. Results are cached to `~/.copilot/gridwatch-mcp-tools-cache.json` (5 min in-memory TTL, persistent on disk). Remote/IDE servers fall back to log-based tool name extraction (no descriptions).
+
+### LSP IPC
+
+| Method | IPC channel | Description |
+|---|---|---|
+| `getLspServers()` | `lsp:get-servers` | Returns `LspServerData[]` from `lsp-config.json` and `gridwatch-lsp-disabled.json` |
+| `toggleLspServer(name)` | `lsp:toggle-server` | Moves server between `lsp-config.json` and `gridwatch-lsp-disabled.json` |
+
+**LSP caching:** In-memory cache with 10s TTL (same pattern as MCP). Cache invalidated on toggle.
 
 ### Agents IPC
 
@@ -195,6 +207,20 @@ interface McpServerData {
   tools: McpTool[]          // queried via JSON-RPC for local, log-scraped for remote
   connectionTime?: number   // ms, from most recent log
   enabled: boolean          // false if in gridwatch-mcp-disabled.json
+}
+```
+
+---
+
+## LspServerData type
+
+```typescript
+interface LspServerData {
+  name: string              // server name from config key (e.g. "terraform", "typescript")
+  command: string           // command to spawn (e.g. "terraform-ls")
+  args: string[]            // command arguments (e.g. ["serve"])
+  fileExtensions: Record<string, string>  // map of extension to language ID (e.g. ".ts" → "typescript")
+  enabled: boolean          // false if in gridwatch-lsp-disabled.json
 }
 ```
 

@@ -28,6 +28,7 @@ GridWatch reads the local session data written by [GitHub Copilot CLI](https://g
 - 🏷️ **Tagging** — add, remove, and filter sessions by custom tags
 - ✦ **Skills management** — browse, create, edit, duplicate, delete, and search your Copilot CLI skills (`~/.copilot/skills/`). View rendered markdown with Tron-themed styling, toggle skills on/off, rename folders, import from files or folders, and export as zip archives. Tag skills with custom labels and filter by tags
 - ◈ **MCP server dashboard** — view all installed Model Context Protocol servers (local stdio and remote HTTP), enable/disable servers to manage context window bloat, browse their full tool catalogues grouped by category with descriptions and parameter schemas (queried live via JSON-RPC `tools/list`), see environment variables (with secret masking), connection times, and command details
+- ⬡ **LSP server dashboard** — view all configured Language Server Protocol servers from `~/.copilot/lsp-config.json`, enable/disable individual servers, see command details and file extension mappings. Gives you full visibility into the code intelligence available to Copilot CLI
 - ◎ **Agents panel** — view built-in Copilot agents (Research, Code Review, Coding) alongside your custom agents from `~/.copilot/agents/`. See session counts, usage stats, and linked session history per agent. Custom agents display with an orange CUSTOM badge, rendered markdown file viewer with Tron-themed styling, and file tabs for multi-file agents. Session lists default to the 5 most recent with a "show all" toggle for performance
 - ✏️ **Rename sessions** — give sessions a meaningful name beyond the auto-generated summary
 - 🗑️ **Archive / Delete** — safely archive or permanently remove old sessions (guards against deleting active sessions)
@@ -56,6 +57,10 @@ GridWatch reads the local session data written by [GitHub Copilot CLI](https://g
 ### MCP Servers
 
 ![MCP Servers](public/images/screenshot-mcp.png)
+
+### LSP Servers
+
+![LSP Servers](public/images/screenshot-lsp.png)
 
 ### Agents
 

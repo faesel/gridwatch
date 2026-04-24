@@ -12,6 +12,7 @@ import InsightsPage from './pages/InsightsPage'
 import TransferPage from './pages/TransferPage'
 import SkillsPage from './pages/SkillsPage'
 import McpPage from './pages/McpPage'
+import LspPage from './pages/LspPage'
 import AgentsPage from './pages/AgentsPage'
 import type { AppSettings } from './pages/SettingsPage'
 
@@ -47,6 +48,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'activity', label: 'ACTIVITY', icon: '◫' },
   { id: 'skills', label: 'SKILLS', icon: '✦' },
   { id: 'mcp', label: 'MCP', icon: '◈' },
+  { id: 'lsp', label: 'LSP', icon: '⬡' },
   { id: 'agents', label: 'AGENTS', icon: '◎' },
   { id: 'insights', label: 'INSIGHTS', icon: '⚡' },
   { id: 'transfer', label: 'TRANSFER', icon: '⇄' },
@@ -104,6 +106,7 @@ function App() {
       case 'activity': return <ActivityPage sessions={sessions} />
       case 'skills': return <SkillsPage refreshKey={refreshKey} />
       case 'mcp': return <McpPage refreshKey={refreshKey} />
+      case 'lsp': return <LspPage refreshKey={refreshKey} />
       case 'agents': return <AgentsPage sessions={sessions} refreshKey={refreshKey} />
       case 'insights': return <InsightsPage sessions={sessions} />
       case 'transfer': return <TransferPage sessions={sessions} />

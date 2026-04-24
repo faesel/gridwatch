@@ -2,6 +2,7 @@ import type { SessionData, SessionSummary, SessionDetail } from './session';
 import type { SkillData } from './skill';
 import type { McpServerData } from './mcp';
 import type { CustomAgentData } from './agent';
+import type { LspServerData } from './lsp';
 
 export interface PromptFeedback {
   prompt: string;
@@ -43,7 +44,7 @@ declare global {
       checkForUpdate: () => Promise<{ hasUpdate: boolean; latestVersion?: string; downloadUrl?: string }>;
       openExternal: (url: string) => Promise<void>;
       showInFolder: (filePath: string) => Promise<void>;
-      openItemFolder: (type: 'session' | 'skill' | 'mcp' | 'agent', name: string) => Promise<void>;
+      openItemFolder: (type: 'session' | 'skill' | 'mcp' | 'agent' | 'lsp', name: string) => Promise<void>;
       saveToken: (token: string) => Promise<boolean>;
       hasToken: () => Promise<boolean>;
       analyseSession: (messages: string[]) => Promise<InsightResult>;
@@ -65,6 +66,10 @@ declare global {
       getMcpServers: () => Promise<McpServerData[]>;
       showMcpConfig: () => Promise<void>;
       toggleMcpServer: (serverName: string) => Promise<{ ok: boolean; enabled: boolean; error?: string }>;
+
+      // LSP
+      getLspServers: () => Promise<LspServerData[]>;
+      toggleLspServer: (serverName: string) => Promise<{ ok: boolean; enabled: boolean; error?: string }>;
 
       // Agents
       getCustomAgents: () => Promise<CustomAgentData[]>;

@@ -194,12 +194,6 @@ function McpPage({ refreshKey }: { refreshKey?: number }) {
                 >
                   {selected.enabled ? '● ENABLED' : '○ DISABLED'}
                 </button>
-                <button
-                  className={styles.actionBtn}
-                  onClick={() => window.gridwatchAPI.showMcpConfig()}
-                >
-                  ◈ CONFIG FILE
-                </button>
               </div>
             )}
 

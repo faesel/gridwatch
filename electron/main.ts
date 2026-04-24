@@ -9,6 +9,7 @@ import type { SessionData, SessionSummary, SessionDetail, TokenDataPoint, Rewind
 import type { SkillData, SkillFile } from '../src/types/skill'
 import type { CustomAgentData } from '../src/types/agent'
 import type { McpServerData, McpEnvVar, McpTool } from '../src/types/mcp'
+import type { LspServerData } from '../src/types/lsp'
 
 // Must be set before app is ready so the OS picks it up for dock/taskbar tooltip
 app.setName('GridWatch')
@@ -970,6 +971,9 @@ ipcMain.handle('app:open-item-folder', async (_e, type: string, name: string) =>
     case 'mcp':
       target = path.join(copilotBase, 'mcp-config.json')
       break
+    case 'lsp':
+      target = path.join(copilotBase, 'lsp-config.json')
+      break
     case 'agent':
       target = path.join(copilotBase, 'agents', `${name}.agent.md`)
       break
@@ -977,7 +981,7 @@ ipcMain.handle('app:open-item-folder', async (_e, type: string, name: string) =>
       throw new Error(`Unknown item type: ${type}`)
   }
   if (!isPathWithin(target, copilotBase)) throw new Error('Path outside allowed directory')
-  if (type === 'mcp' || type === 'agent') {
+  if (type === 'mcp' || type === 'agent' || type === 'lsp') {
     shell.showItemInFolder(target)
   } else {
     const err = await shell.openPath(target)
@@ -1890,5 +1894,105 @@ ipcMain.handle('agents:get-file', async (_e, agentName: string, fileName: string
     return fs.readFileSync(filePath, 'utf-8')
   } catch {
     return null
+  }
+})
+
+// ── LSP IPC ─────────────────────────────────────────────────────────────
+
+const lspConfigPath = path.join(os.homedir(), '.copilot', 'lsp-config.json')
+const lspDisabledPath = path.join(os.homedir(), '.copilot', 'gridwatch-lsp-disabled.json')
+let lspServersCache: { data: LspServerData[]; timestamp: number } | null = null
+const LSP_CACHE_TTL = 10_000
+
+function parseLspEntry(name: string, def: unknown, enabled: boolean): LspServerData {
+  const d = def as Record<string, unknown>
+  return {
+    name,
+    command: typeof d.command === 'string' ? d.command : '',
+    args: Array.isArray(d.args) ? d.args.map(String) : [],
+    fileExtensions: (typeof d.fileExtensions === 'object' && d.fileExtensions !== null)
+      ? d.fileExtensions as Record<string, string> : {},
+    enabled,
+  }
+}
+
+ipcMain.handle('lsp:get-servers', async (): Promise<LspServerData[]> => {
+  if (lspServersCache && Date.now() - lspServersCache.timestamp < LSP_CACHE_TTL) {
+    return lspServersCache.data
+  }
+  try {
+    const servers: LspServerData[] = []
+
+    // Read enabled servers
+    if (fs.existsSync(lspConfigPath)) {
+      const raw = fs.readFileSync(lspConfigPath, 'utf-8')
+      const config = JSON.parse(raw)
+      const lspServers: Record<string, unknown> = config.lspServers ?? {}
+      for (const [name, def] of Object.entries(lspServers)) {
+        servers.push(parseLspEntry(name, def, true))
+      }
+    }
+
+    // Read disabled servers
+    if (fs.existsSync(lspDisabledPath)) {
+      try {
+        const raw = fs.readFileSync(lspDisabledPath, 'utf-8')
+        const disabled: Record<string, unknown> = JSON.parse(raw)
+        for (const [name, def] of Object.entries(disabled)) {
+          servers.push(parseLspEntry(name, def, false))
+        }
+      } catch { /* ignore malformed disabled file */ }
+    }
+
+    const sorted = servers.sort((a, b) => a.name.localeCompare(b.name))
+    lspServersCache = { data: sorted, timestamp: Date.now() }
+    return sorted
+  } catch {
+    return []
+  }
+})
+
+ipcMain.handle('lsp:toggle-server', async (_e, serverName: string): Promise<{ ok: boolean; enabled: boolean; error?: string }> => {
+  try {
+    if (typeof serverName !== 'string' || !serverName || PROTOTYPE_POLLUTION_KEYS.has(serverName)) {
+      return { ok: false, enabled: false, error: 'Invalid server name' }
+    }
+
+    // Read current config
+    const configRaw = fs.existsSync(lspConfigPath) ? fs.readFileSync(lspConfigPath, 'utf-8') : '{}'
+    const config = JSON.parse(configRaw)
+    const lspServers: Record<string, unknown> = config.lspServers ?? {}
+
+    // Read disabled store
+    const disabledRaw = fs.existsSync(lspDisabledPath) ? fs.readFileSync(lspDisabledPath, 'utf-8') : '{}'
+    const disabled: Record<string, unknown> = JSON.parse(disabledRaw)
+
+    if (Object.prototype.hasOwnProperty.call(lspServers, serverName)) {
+      // Disable: move from config to disabled store
+      disabled[serverName] = lspServers[serverName]
+      delete lspServers[serverName]
+      config.lspServers = lspServers
+      fs.writeFileSync(lspConfigPath, JSON.stringify(config, null, 2) + '\n', 'utf-8')
+      fs.writeFileSync(lspDisabledPath, JSON.stringify(disabled, null, 2) + '\n', 'utf-8')
+      lspServersCache = null
+      return { ok: true, enabled: false }
+    } else if (Object.prototype.hasOwnProperty.call(disabled, serverName)) {
+      // Enable: move from disabled store back to config
+      lspServers[serverName] = disabled[serverName]
+      delete disabled[serverName]
+      config.lspServers = lspServers
+      fs.writeFileSync(lspConfigPath, JSON.stringify(config, null, 2) + '\n', 'utf-8')
+      if (Object.keys(disabled).length === 0) {
+        if (fs.existsSync(lspDisabledPath)) fs.unlinkSync(lspDisabledPath)
+      } else {
+        fs.writeFileSync(lspDisabledPath, JSON.stringify(disabled, null, 2) + '\n', 'utf-8')
+      }
+      lspServersCache = null
+      return { ok: true, enabled: true }
+    }
+
+    return { ok: false, enabled: false, error: 'Server not found' }
+  } catch (err) {
+    return { ok: false, enabled: false, error: (err as Error).message }
   }
 })

@@ -64,6 +64,11 @@ contextBridge.exposeInMainWorld('gridwatchAPI', {
   toggleMcpServer: (serverName: string) =>
     ipcRenderer.invoke('mcp:toggle-server', serverName),
 
+  // LSP
+  getLspServers: () => ipcRenderer.invoke('lsp:get-servers'),
+  toggleLspServer: (serverName: string) =>
+    ipcRenderer.invoke('lsp:toggle-server', serverName),
+
   // Agents
   getCustomAgents: () => ipcRenderer.invoke('agents:get-all'),
   getAgentFile: (agentName: string, fileName: string) =>
