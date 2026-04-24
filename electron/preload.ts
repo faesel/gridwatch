@@ -74,6 +74,11 @@ contextBridge.exposeInMainWorld('gridwatchAPI', {
   getAgentFile: (agentName: string, fileName: string) =>
     ipcRenderer.invoke('agents:get-file', agentName, fileName),
 
+  // Allowed Directories
+  getAllowedDirs: () => ipcRenderer.invoke('dirs:get-all'),
+  addAllowedDir: () => ipcRenderer.invoke('dirs:add'),
+  removeAllowedDir: (dirPath: string) => ipcRenderer.invoke('dirs:remove', dirPath),
+
   // Window controls
   getPlatform: () => ipcRenderer.invoke('app:get-platform'),
   windowMinimize: () => ipcRenderer.invoke('window:minimize'),
