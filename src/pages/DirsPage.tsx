@@ -158,7 +158,7 @@ function DirsPage({ refreshKey }: { refreshKey?: number }) {
               {!selected.exists && <span className={styles.missingBadge}>NOT FOUND</span>}
               <button
                 className={styles.openFolderBtn}
-                onClick={() => void window.gridwatchAPI.openItemFolder('dirs', 'gridwatch-allowed-dirs.json').catch(() => {})}
+                onClick={() => void window.gridwatchAPI.openItemFolder('dirs', 'gridwatch-allowed-dirs.json').catch((err: Error) => setError(err?.message || 'Failed to reveal config file'))}
                 title="Show allowed-dirs config file"
                 aria-label="Show allowed-dirs config file in folder"
               >⊞</button>
