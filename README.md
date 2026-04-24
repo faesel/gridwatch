@@ -267,9 +267,8 @@ Releases are built and published automatically by GitHub Actions when a version 
 
 ```bash
 # 1. Bump the version (choose one)
-npm version patch --no-git-tag-version   # 0.5.4 → 0.5.5  (bug fixes)
-npm version minor --no-git-tag-version   # 0.5.4 → 0.6.0  (new features)
-npm version major --no-git-tag-version   # 0.5.4 → 1.0.0  (breaking changes)
+npm version patch --no-git-tag-version   # 0.5.4 → 0.5.5  (minor changes, bug fixes)
+npm version minor --no-git-tag-version   # 0.5.4 → 0.6.0  (major features, breaking changes)
 
 # 2. Commit and push
 git add package.json package-lock.json
