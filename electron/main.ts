@@ -2011,7 +2011,7 @@ const DIRS_CACHE_TTL = 10_000
 const MAX_DIR_PATH_LENGTH = 4096
 
 /** Characters that must not appear in a managed directory path */
-const SHELL_METACHAR_IN_PATH = /[;|&`$()><\0]/
+const SHELL_METACHAR_IN_PATH = /[;|&`$()><\0%]/
 
 function isValidDirPath(p: unknown): p is string {
   if (typeof p !== 'string') return false
@@ -2019,8 +2019,9 @@ function isValidDirPath(p: unknown): p is string {
   if (SHELL_METACHAR_IN_PATH.test(p)) return false
   // Must be absolute
   if (!path.isAbsolute(p)) return false
-  // Normalised path must equal itself (no ../ traversal after normalise)
-  if (path.normalize(p) !== p) return false
+  // Reject paths containing '..' segments (path traversal guard)
+  const parts = p.split(/[\\/]/)
+  if (parts.includes('..') || parts.includes('.')) return false
   return true
 }
 
@@ -2034,7 +2035,7 @@ function readAllowedDirs(): { path: string; addedAt: string }[] {
       (d: unknown): d is { path: string; addedAt: string } =>
         d !== null &&
         typeof d === 'object' &&
-        typeof (d as Record<string, unknown>).path === 'string' &&
+        isValidDirPath((d as Record<string, unknown>).path) &&
         typeof (d as Record<string, unknown>).addedAt === 'string',
     )
   } catch {
