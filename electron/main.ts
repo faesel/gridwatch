@@ -2021,7 +2021,7 @@ function isValidDirPath(p: unknown): p is string {
   if (!path.isAbsolute(p)) return false
   // Reject paths containing '..' segments (path traversal guard)
   const parts = p.split(/[\\/]/)
-  if (parts.includes('..') || parts.includes('.')) return false
+  if (parts.includes('..')) return false
   return true
 }
 
