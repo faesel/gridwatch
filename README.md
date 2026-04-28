@@ -13,6 +13,26 @@ GridWatch reads the local session data written by [GitHub Copilot CLI](https://g
 
 ---
 
+## 📑 Table of contents
+
+- [Features](#-features)
+- [Screenshots](#-screenshots)
+- [Prerequisites](#-prerequisites)
+- [Installation](#-installation)
+- [Development](#%EF%B8%8F-development)
+  - [Project structure](#-project-structure)
+  - [Available scripts](#-available-scripts)
+  - [Data sources](#-data-sources)
+  - [Security](#-security)
+  - [Tech stack](#%EF%B8%8F-tech-stack)
+  - [Design system](#-design-system)
+- [Releasing](#-releasing)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Author](#-author)
+
+---
+
 ## ✨ Features
 
 - 📋 **Sessions overview** — browse all Copilot CLI sessions with live status, token utilisation, and last prompt
