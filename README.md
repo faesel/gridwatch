@@ -193,26 +193,38 @@ npm run pack:all     # Build for all platforms
 
 GridWatch reads exclusively from local files — no network requests are made except to check for updates and (optionally) to call the GitHub Models API for AI Insights.
 
+**Copilot directories (always present):**
+
+| Data                     | Source                                                                                          |
+| ------------------------ | ----------------------------------------------------------------------------------------------- |
+| Session metadata         | `~/.copilot/session-state/<uuid>/workspace.yaml`                                                |
+| Prompt history           | `~/.copilot/session-state/<uuid>/events.jsonl`                                                  |
+| Rewind snapshots         | `~/.copilot/session-state/<uuid>/rewind-snapshots/index.json`                                   |
+| Research reports         | `~/.copilot/session-state/<uuid>/research/*.md`                                                 |
+| Token usage & compaction | `~/.copilot/logs/process-<timestamp>-<pid>.log`                                                 |
+| Copilot skills           | `~/.copilot/skills/<name>/SKILL.md`                                                             |
+| MCP server config        | `~/.copilot/mcp-config.json`                                                                    |
+| LSP server config        | `~/.copilot/lsp-config.json`                                                                    |
+| Custom agent profiles    | `~/.copilot/agents/<name>.agent.md` (read-only — agent profiles with YAML frontmatter)          |
+
+**GridWatch-specific files (created and managed by GridWatch):**
+
 | Data                       | Source                                                                                                                                                   |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Session metadata           | `~/.copilot/session-state/<uuid>/workspace.yaml`                                                                                                         |
-| Prompt history             | `~/.copilot/session-state/<uuid>/events.jsonl`                                                                                                           |
-| Rewind snapshots           | `~/.copilot/session-state/<uuid>/rewind-snapshots/index.json`                                                                                            |
-| Research reports           | `~/.copilot/session-state/<uuid>/research/*.md`                                                                                                          |
-| Token usage & compaction   | `~/.copilot/logs/process-<timestamp>-<pid>.log`                                                                                                          |
 | Archived sessions          | `~/.copilot/session-state-archived/<uuid>/` (moved here by GridWatch archive)                                                                            |
-| Session tags / custom data | `~/.copilot/session-state/<uuid>/gridwatch.json` (written by GridWatch)                                                                                  |
-| Skill tags / custom data   | `~/.copilot/skills/<name>/gridwatch.json` (written by GridWatch)                                                                                         |
-| Copilot skills             | `~/.copilot/skills/<name>/SKILL.md` (read/write for skill management)                                                                                    |
-| MCP server config          | `~/.copilot/mcp-config.json` (local MCP server definitions, read/write for enable/disable toggle)                                                        |
-| Disabled MCP servers       | `~/.copilot/gridwatch-mcp-disabled.json` (written by GridWatch when servers are toggled off)                                                             |
-| MCP tool discovery         | MCP servers queried directly via JSON-RPC `tools/list` (spawns each local server briefly); results cached to `~/.copilot/gridwatch-mcp-tools-cache.json` |
-| Custom agent profiles      | `~/.copilot/agents/<name>.agent.md` (read-only — agent profiles with YAML frontmatter)                                                                       |
-| LSP server config          | `~/.copilot/lsp-config.json` (language server definitions, read/write for enable/disable toggle)                                                             |
-| Disabled LSP servers       | `~/.copilot/gridwatch-lsp-disabled.json` (written by GridWatch when servers are toggled off)                                                                 |
+| Session tags / custom data | `~/.copilot/session-state/<uuid>/gridwatch.json`                                                                                                         |
+| Skill tags / custom data   | `~/.copilot/skills/<name>/gridwatch.json`                                                                                                                |
 | Disabled skills            | `~/.copilot/skills-disabled/<name>/` (moved here when toggled off)                                                                                       |
+| Disabled MCP servers       | `~/.copilot/gridwatch-mcp-disabled.json`                                                                                                                 |
+| MCP tool cache             | `~/.copilot/gridwatch-mcp-tools-cache.json` (cached from JSON-RPC `tools/list` queries)                                                                 |
+| Disabled LSP servers       | `~/.copilot/gridwatch-lsp-disabled.json`                                                                                                                 |
 | Encrypted API token        | `~/.copilot/gridwatch-token.enc` (encrypted via OS keychain)                                                                                             |
-| Update check               | `api.github.com/repos/faesel/gridwatch/releases/latest` (on startup only)                                                                                |
+
+**Network requests:**
+
+| Request      | Endpoint                                                       | When             |
+| ------------ | -------------------------------------------------------------- | ---------------- |
+| Update check | `api.github.com/repos/faesel/gridwatch/releases/latest`       | On startup only  |
 
 ### 🔒 Security
 
