@@ -979,7 +979,7 @@ ipcMain.handle('app:open-item-folder', async (_e, type: string, name: string) =>
       target = path.join(copilotBase, 'agents', `${name}.agent.md`)
       break
     case 'dirs':
-      target = copilotSettingsPath
+      target = copilotConfigPath
       break
     default:
       throw new Error(`Unknown item type: ${type}`)
@@ -2003,7 +2003,7 @@ ipcMain.handle('lsp:toggle-server', async (_e, serverName: string): Promise<{ ok
 
 // ── Allowed Directories IPC ──────────────────────────────────────────────────
 
-const copilotSettingsPath = path.join(os.homedir(), '.copilot', 'settings.json')
+const copilotConfigPath = path.join(os.homedir(), '.copilot', 'config.json')
 let allowedDirsCache: { data: AllowedDirectory[]; timestamp: number } | null = null
 const DIRS_CACHE_TTL = 10_000
 
@@ -2025,12 +2025,14 @@ function isValidDirPath(p: unknown): p is string {
   return true
 }
 
-/** Read the Copilot CLI settings.json */
-function readCopilotSettings(): Record<string, unknown> {
-  if (!fs.existsSync(copilotSettingsPath)) return {}
+/** Read the Copilot CLI config.json, stripping leading comments */
+function readCopilotConfig(): Record<string, unknown> {
+  if (!fs.existsSync(copilotConfigPath)) return {}
   try {
-    const raw = fs.readFileSync(copilotSettingsPath, 'utf-8')
-    const parsed = JSON.parse(raw)
+    const raw = fs.readFileSync(copilotConfigPath, 'utf-8')
+    // config.json may have leading // comments — strip them before parsing
+    const jsonStr = raw.replace(/^\s*\/\/[^\n]*\n/gm, '')
+    const parsed = JSON.parse(jsonStr)
     if (!parsed || typeof parsed !== 'object') return {}
     return parsed as Record<string, unknown>
   } catch {
@@ -2038,22 +2040,23 @@ function readCopilotSettings(): Record<string, unknown> {
   }
 }
 
-/** Write back to settings.json */
-function writeCopilotSettings(config: Record<string, unknown>): void {
-  fs.writeFileSync(copilotSettingsPath, JSON.stringify(config, null, 2) + '\n', 'utf-8')
+/** Write back to config.json preserving the leading comment */
+function writeCopilotConfig(config: Record<string, unknown>): void {
+  const comment = '// User settings belong in settings.json.\n// This file is managed automatically.\n'
+  fs.writeFileSync(copilotConfigPath, comment + JSON.stringify(config, null, 2) + '\n', 'utf-8')
 }
 
 function readTrustedFolders(): string[] {
-  const config = readCopilotSettings()
+  const config = readCopilotConfig()
   const folders = config.trustedFolders
   if (!Array.isArray(folders)) return []
   return folders.filter((f): f is string => isValidDirPath(f))
 }
 
 function writeTrustedFolders(folders: string[]): void {
-  const config = readCopilotSettings()
+  const config = readCopilotConfig()
   config.trustedFolders = folders
-  writeCopilotSettings(config)
+  writeCopilotConfig(config)
 }
 
 ipcMain.handle('dirs:get-all', async (): Promise<AllowedDirectory[]> => {

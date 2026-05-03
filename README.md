@@ -227,7 +227,7 @@ GridWatch reads exclusively from local files — no network requests are made ex
 | MCP server config        | `~/.copilot/mcp-config.json`                                                                    |
 | LSP server config        | `~/.copilot/lsp-config.json`                                                                    |
 | Custom agent profiles    | `~/.copilot/agents/<name>.agent.md` (read-only — agent profiles with YAML frontmatter)          |
-| Trusted directories      | `~/.copilot/settings.json` → `trustedFolders` array                                             |
+| Trusted directories      | `~/.copilot/config.json` → `trustedFolders` array                                               |
 
 **GridWatch-specific files (created and managed by GridWatch):**
 
@@ -279,11 +279,11 @@ The Settings page provides UI preferences and Copilot CLI configuration manageme
 | Density   | Padding and spacing between elements              | Compact / Default / Comfortable      |
 | Theme     | Colour scheme                                     | The Grid (cyan/blue) / Programs (red) |
 
-**Copilot CLI configuration** (stored in `~/.copilot/settings.json`):
+**Copilot CLI configuration** (stored in `~/.copilot/config.json`):
 
 | Setting              | Description                                                                      | Config key       |
 | -------------------- | -------------------------------------------------------------------------------- | ---------------- |
-| Trusted Directories  | Directories Copilot CLI can access without the startup trust prompt. Add/remove via folder picker or edit `settings.json` directly | `trustedFolders` |
+| Trusted Directories  | Directories Copilot CLI can access without the startup trust prompt. Add/remove via folder picker or edit `config.json` directly | `trustedFolders` |
 
 **Other:**
 
