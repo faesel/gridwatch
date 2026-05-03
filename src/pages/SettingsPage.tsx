@@ -73,6 +73,13 @@ const SPACING_PRESETS: { label: string; value: AppSettings['spacing'] }[] = [
   { label: 'COMFORTABLE', value: 'comfortable' },
 ]
 
+function toolSpecKind(spec: string): 'shell' | 'write' | 'mcp' | 'other' {
+  if (spec === 'write') return 'write'
+  if (spec === 'shell' || spec.startsWith('shell(')) return 'shell'
+  if (spec.includes('(')) return 'mcp'
+  return 'other'
+}
+
 interface Props {
   settings: AppSettings
   onChange: (s: AppSettings) => void
@@ -192,12 +199,6 @@ function SettingsPage({ settings, onChange }: Props) {
     update({ ...DEFAULT_SETTINGS })
   }
 
-  function toolSpecKind(spec: string): 'shell' | 'write' | 'mcp' | 'other' {
-    if (spec === 'write') return 'write'
-    if (spec === 'shell' || spec.startsWith('shell(')) return 'shell'
-    if (spec.includes('(')) return 'mcp'
-    return 'other'
-  }
 
   return (
     <div className={styles.page}>

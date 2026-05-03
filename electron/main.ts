@@ -2152,6 +2152,9 @@ const TOOL_PERMS_CACHE_TTL = 10_000
 /** Max length for a tool spec string */
 const MAX_TOOL_SPEC_LENGTH = 512
 
+/** Max length for the argument portion inside parentheses of a tool spec */
+const MAX_TOOL_ARG_LENGTH = 200
+
 /**
  * Valid tool specs:
  *   write
@@ -2161,7 +2164,7 @@ const MAX_TOOL_SPEC_LENGTH = 512
  * where IDENTIFIER starts with a letter and contains letters, digits, hyphens, underscores,
  * and ARGUMENT may not contain parentheses (prevents unbalanced nesting).
  */
-const TOOL_SPEC_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*(\([^)(]{0,200}\))?$/
+const TOOL_SPEC_PATTERN = new RegExp(`^[a-zA-Z][a-zA-Z0-9_-]*(\\([^)(]{0,${MAX_TOOL_ARG_LENGTH}}\\))?$`)
 
 function isValidToolSpec(spec: unknown): spec is string {
   if (typeof spec !== 'string') return false
@@ -2219,9 +2222,6 @@ ipcMain.handle(
       if (!isValidToolSpec(toolSpec)) {
         return { ok: false, error: 'Invalid tool specification' }
       }
-      if (PROTOTYPE_POLLUTION_KEYS.has(toolSpec)) {
-        return { ok: false, error: 'Invalid tool specification' }
-      }
 
       const config = readPermissionsConfig()
       const entry = config[projectPath] ?? {}
@@ -2250,9 +2250,6 @@ ipcMain.handle(
         return { ok: false, error: 'Invalid project path' }
       }
       if (!isValidToolSpec(toolSpec)) {
-        return { ok: false, error: 'Invalid tool specification' }
-      }
-      if (PROTOTYPE_POLLUTION_KEYS.has(toolSpec)) {
         return { ok: false, error: 'Invalid tool specification' }
       }
 

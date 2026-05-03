@@ -641,11 +641,14 @@
   border-color: var(--tron-cyan) !important;
   box-shadow: 0 0 6px rgba(0, 245, 255, 0.25);
   cursor: default;
+  opacity: 1;
 }
 
-.toolBadgeAllowed:hover {
+.toolBadgeAllowed:hover,
+.toolBadgeAllowed:disabled {
   background: rgba(0, 245, 255, 0.1) !important;
   box-shadow: 0 0 6px rgba(0, 245, 255, 0.25);
+  opacity: 1;
 }
 
 .toolUndoToast {

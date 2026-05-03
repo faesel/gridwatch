@@ -125,7 +125,7 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
     return () => clearTimeout(timer)
   }, [search])
 
-  // Clean up the undo timer on unmount to prevent state updates after unmount
+  // Prevent memory leaks from pending undo timers when the component unmounts
   useEffect(() => {
     return () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current) }
   }, [])
@@ -713,6 +713,7 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
                       key={tool}
                       className={`${styles.toolBadge} ${isAllowed ? styles.toolBadgeAllowed : ''}`}
                       onClick={() => { if (!isAllowed) setConfirmAllowTool(tool) }}
+                      disabled={isAllowed}
                       title={isAllowed ? 'Already in allowed tools list' : 'Click to add to allowed tools'}
                       aria-label={isAllowed ? `${tool} (allowed)` : `Add ${tool} to allowed tools`}
                     >
