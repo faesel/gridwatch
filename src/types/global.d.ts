@@ -45,7 +45,7 @@ declare global {
       checkForUpdate: () => Promise<{ hasUpdate: boolean; latestVersion?: string; downloadUrl?: string }>;
       openExternal: (url: string) => Promise<void>;
       showInFolder: (filePath: string) => Promise<void>;
-      openItemFolder: (type: 'session' | 'skill' | 'mcp' | 'agent' | 'lsp', name: string) => Promise<void>;
+      openItemFolder: (type: 'session' | 'skill' | 'mcp' | 'agent' | 'lsp' | 'dirs', name: string) => Promise<void>;
       saveToken: (token: string) => Promise<boolean>;
       hasToken: () => Promise<boolean>;
       analyseSession: (messages: string[]) => Promise<InsightResult>;
