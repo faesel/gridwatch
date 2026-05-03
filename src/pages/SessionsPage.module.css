@@ -625,6 +625,116 @@
   border: 1px solid var(--tron-cyan);
   color: var(--tron-cyan);
   letter-spacing: 0.5px;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.toolBadge:hover {
+  background: rgba(0, 245, 255, 0.08);
+  box-shadow: 0 0 6px rgba(0, 245, 255, 0.2);
+}
+
+.toolBadgeAllowed {
+  background: rgba(0, 245, 255, 0.1) !important;
+  border-color: var(--tron-cyan) !important;
+  box-shadow: 0 0 6px rgba(0, 245, 255, 0.25);
+  cursor: default;
+}
+
+.toolBadgeAllowed:hover {
+  background: rgba(0, 245, 255, 0.1) !important;
+  box-shadow: 0 0 6px rgba(0, 245, 255, 0.25);
+}
+
+.toolUndoToast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  margin-bottom: 8px;
+  background: rgba(0, 245, 255, 0.06);
+  border: 1px solid rgba(0, 245, 255, 0.3);
+  color: var(--tron-cyan);
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  letter-spacing: 0.5px;
+}
+
+.toolUndoBtn {
+  background: none;
+  border: 1px solid rgba(0, 245, 255, 0.4);
+  color: var(--tron-cyan);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 3px 10px;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.toolUndoBtn:hover {
+  background: rgba(0, 245, 255, 0.12);
+}
+
+.toolConfirmBox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: rgba(0, 128, 255, 0.06);
+  border: 1px solid rgba(0, 128, 255, 0.3);
+  color: var(--tron-text);
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  letter-spacing: 0.5px;
+}
+
+.toolConfirmActions {
+  display: flex;
+  gap: 8px;
+}
+
+.toolConfirmBtn {
+  background: rgba(0, 128, 255, 0.1);
+  border: 1px solid var(--tron-blue);
+  color: var(--tron-blue);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 4px 14px;
+  transition: background 0.15s;
+}
+
+.toolConfirmBtn:hover {
+  background: rgba(0, 128, 255, 0.2);
+}
+
+.toolConfirmBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.toolConfirmCancelBtn {
+  background: none;
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text-dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 4px 12px;
+  transition: all 0.15s;
+}
+
+.toolConfirmCancelBtn:hover {
+  border-color: var(--tron-text-dim);
+  color: var(--tron-text);
 }
 
 .rewindItem {

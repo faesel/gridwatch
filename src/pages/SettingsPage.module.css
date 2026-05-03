@@ -338,3 +338,202 @@
   padding: 0 4px;
   margin-left: auto;
 }
+
+/* ── Allowed Tools ─────────────────────────── */
+.toolEmpty {
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  letter-spacing: 0.5px;
+  padding: 12px 0;
+}
+
+.toolError {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  background: rgba(255, 102, 0, 0.08);
+  border: 1px solid rgba(255, 102, 0, 0.3);
+  color: var(--tron-orange);
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  letter-spacing: 0.5px;
+}
+
+.toolErrorDismiss {
+  background: none;
+  border: none;
+  color: var(--tron-orange);
+  cursor: pointer;
+  font-size: calc(14 * var(--font-scale, 1) * 1px);
+  padding: 0 4px;
+  margin-left: auto;
+}
+
+.toolProjectList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.toolProject {
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--tron-border);
+}
+
+.toolProjectPath {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  letter-spacing: 0.5px;
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 8px;
+}
+
+.toolChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.toolChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  padding: 3px 6px 3px 8px;
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text);
+  letter-spacing: 0.5px;
+  font-family: monospace;
+}
+
+/* shell tools — orange tint (higher risk) */
+.toolChip_shell {
+  border-color: rgba(255, 102, 0, 0.4);
+  color: var(--tron-orange);
+  background: rgba(255, 102, 0, 0.06);
+}
+
+/* write tool — blue tint */
+.toolChip_write {
+  border-color: rgba(0, 128, 255, 0.4);
+  color: var(--tron-blue);
+  background: rgba(0, 128, 255, 0.06);
+}
+
+/* MCP tools — cyan tint */
+.toolChip_mcp {
+  border-color: rgba(0, 245, 255, 0.3);
+  color: var(--tron-cyan);
+  background: rgba(0, 245, 255, 0.05);
+}
+
+/* other/unknown */
+.toolChip_other {
+  border-color: var(--tron-border);
+  color: var(--tron-text);
+}
+
+.toolChipRemove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  color: inherit;
+  opacity: 0.5;
+  padding: 0 2px;
+  line-height: 1;
+  transition: opacity 0.15s;
+}
+
+.toolChipRemove:hover {
+  opacity: 1;
+}
+
+.toolChipRemove:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.toolAddForm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.toolAddRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.toolAddInput {
+  flex: 1;
+  background: var(--tron-bg);
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text);
+  font-family: monospace;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  padding: 7px 10px;
+  outline: none;
+  letter-spacing: 0.5px;
+  transition: border-color 0.2s;
+}
+
+.toolAddInput:focus {
+  border-color: var(--tron-cyan);
+}
+
+.toolAddInput::placeholder {
+  color: var(--tron-text-dim);
+  font-family: inherit;
+}
+
+.toolAddBtn {
+  background: rgba(0, 245, 255, 0.06);
+  border: 1px solid rgba(0, 245, 255, 0.3);
+  color: var(--tron-cyan);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 7px 16px;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.toolAddBtn:hover {
+  background: rgba(0, 245, 255, 0.12);
+  border-color: var(--tron-cyan);
+}
+
+.toolAddBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.toolCancelBtn {
+  background: none;
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text-dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 7px 12px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.toolCancelBtn:hover {
+  border-color: var(--tron-text-dim);
+  color: var(--tron-text);
+}

@@ -4,6 +4,7 @@ import type { McpServerData } from './mcp';
 import type { CustomAgentData } from './agent';
 import type { LspServerData } from './lsp';
 import type { AllowedDirectory } from './dirs';
+import type { ProjectToolPermissions } from './tools';
 
 export interface PromptFeedback {
   prompt: string;
@@ -80,6 +81,11 @@ declare global {
       getAllowedDirs: () => Promise<AllowedDirectory[]>;
       addAllowedDir: () => Promise<{ ok: boolean; directory?: AllowedDirectory; error?: string }>;
       removeAllowedDir: (dirPath: string) => Promise<{ ok: boolean; error?: string }>;
+
+      // Tool Permissions
+      getToolPermissions: () => Promise<ProjectToolPermissions[]>;
+      allowTool: (projectPath: string, toolSpec: string) => Promise<{ ok: boolean; error?: string }>;
+      removeToolPermission: (projectPath: string, toolSpec: string) => Promise<{ ok: boolean; error?: string }>;
 
       // Window controls
       getPlatform: () => Promise<string>;

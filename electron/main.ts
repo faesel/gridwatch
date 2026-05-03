@@ -11,6 +11,7 @@ import type { CustomAgentData } from '../src/types/agent'
 import type { McpServerData, McpEnvVar, McpTool } from '../src/types/mcp'
 import type { LspServerData } from '../src/types/lsp'
 import type { AllowedDirectory } from '../src/types/dirs'
+import type { ProjectToolPermissions } from '../src/types/tools'
 
 // Must be set before app is ready so the OS picks it up for dock/taskbar tooltip
 app.setName('GridWatch')
@@ -2141,3 +2142,139 @@ ipcMain.handle('dirs:remove', async (_e, dirPath: string): Promise<{ ok: boolean
     return { ok: false, error: (err as Error).message }
   }
 })
+
+// ── Tool Permissions IPC ─────────────────────────────────────────────────────
+
+const permissionsConfigPath = path.join(os.homedir(), '.copilot', 'permissions-config.json')
+let toolPermissionsCache: { data: ProjectToolPermissions[]; timestamp: number } | null = null
+const TOOL_PERMS_CACHE_TTL = 10_000
+
+/** Max length for a tool spec string */
+const MAX_TOOL_SPEC_LENGTH = 512
+
+/**
+ * Valid tool specs:
+ *   write
+ *   shell(COMMAND)
+ *   IDENTIFIER
+ *   IDENTIFIER(ARGUMENT)
+ * where IDENTIFIER starts with a letter and contains letters, digits, hyphens, underscores,
+ * and ARGUMENT may not contain parentheses (prevents unbalanced nesting).
+ */
+const TOOL_SPEC_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*(\([^)(]{0,200}\))?$/
+
+function isValidToolSpec(spec: unknown): spec is string {
+  if (typeof spec !== 'string') return false
+  if (!spec || spec.length > MAX_TOOL_SPEC_LENGTH) return false
+  return TOOL_SPEC_PATTERN.test(spec)
+}
+
+function readPermissionsConfig(): Record<string, { allowedTools?: string[] }> {
+  if (!fs.existsSync(permissionsConfigPath)) return {}
+  try {
+    const raw = fs.readFileSync(permissionsConfigPath, 'utf-8')
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    return parsed as Record<string, { allowedTools?: string[] }>
+  } catch {
+    return {}
+  }
+}
+
+function writePermissionsConfig(config: Record<string, { allowedTools?: string[] }>): void {
+  fs.writeFileSync(permissionsConfigPath, JSON.stringify(config, null, 2) + '\n', 'utf-8')
+}
+
+ipcMain.handle('tools:get-permissions', async (): Promise<ProjectToolPermissions[]> => {
+  if (toolPermissionsCache && Date.now() - toolPermissionsCache.timestamp < TOOL_PERMS_CACHE_TTL) {
+    return toolPermissionsCache.data
+  }
+  try {
+    const config = readPermissionsConfig()
+    const data: ProjectToolPermissions[] = Object.entries(config)
+      .filter(([key]) => !PROTOTYPE_POLLUTION_KEYS.has(key))
+      .map(([projectPath, entry]) => ({
+        projectPath,
+        allowedTools: Array.isArray(entry?.allowedTools)
+          ? entry.allowedTools.filter((t): t is string => isValidToolSpec(t))
+          : [],
+      }))
+    toolPermissionsCache = { data, timestamp: Date.now() }
+    return data
+  } catch {
+    return []
+  }
+})
+
+ipcMain.handle(
+  'tools:allow-tool',
+  async (_e, projectPath: string, toolSpec: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      if (!isValidDirPath(projectPath)) {
+        return { ok: false, error: 'Invalid project path' }
+      }
+      if (PROTOTYPE_POLLUTION_KEYS.has(projectPath)) {
+        return { ok: false, error: 'Invalid project path' }
+      }
+      if (!isValidToolSpec(toolSpec)) {
+        return { ok: false, error: 'Invalid tool specification' }
+      }
+      if (PROTOTYPE_POLLUTION_KEYS.has(toolSpec)) {
+        return { ok: false, error: 'Invalid tool specification' }
+      }
+
+      const config = readPermissionsConfig()
+      const entry = config[projectPath] ?? {}
+      const existing = Array.isArray(entry.allowedTools) ? entry.allowedTools : []
+      if (existing.includes(toolSpec)) {
+        return { ok: false, error: 'Tool is already in the allowed list' }
+      }
+      config[projectPath] = { ...entry, allowedTools: [...existing, toolSpec] }
+      writePermissionsConfig(config)
+      toolPermissionsCache = null
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  },
+)
+
+ipcMain.handle(
+  'tools:remove-tool',
+  async (_e, projectPath: string, toolSpec: string): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      if (!isValidDirPath(projectPath)) {
+        return { ok: false, error: 'Invalid project path' }
+      }
+      if (PROTOTYPE_POLLUTION_KEYS.has(projectPath)) {
+        return { ok: false, error: 'Invalid project path' }
+      }
+      if (!isValidToolSpec(toolSpec)) {
+        return { ok: false, error: 'Invalid tool specification' }
+      }
+      if (PROTOTYPE_POLLUTION_KEYS.has(toolSpec)) {
+        return { ok: false, error: 'Invalid tool specification' }
+      }
+
+      const config = readPermissionsConfig()
+      const entry = config[projectPath]
+      if (!entry) return { ok: false, error: 'Project not found in permissions' }
+      const existing = Array.isArray(entry.allowedTools) ? entry.allowedTools : []
+      const next = existing.filter((t) => t !== toolSpec)
+      if (next.length === existing.length) {
+        return { ok: false, error: 'Tool not found in allowed list' }
+      }
+      if (next.length === 0) {
+        // Remove the project key entirely when no tools remain
+        delete config[projectPath]
+      } else {
+        config[projectPath] = { ...entry, allowedTools: next }
+      }
+      writePermissionsConfig(config)
+      toolPermissionsCache = null
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  },
+)

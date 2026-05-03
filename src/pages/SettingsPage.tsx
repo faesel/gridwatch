@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, memo } from 'react'
 import type { AllowedDirectory } from '../types/dirs'
+import type { ProjectToolPermissions } from '../types/tools'
 import styles from './SettingsPage.module.css'
 
 export interface AppSettings {
@@ -85,6 +86,15 @@ function SettingsPage({ settings, onChange }: Props) {
   const [removingDir, setRemovingDir] = useState<string | null>(null)
   const [dirError, setDirError] = useState<string | null>(null)
 
+  // Tool permissions state
+  const [toolPerms, setToolPerms] = useState<ProjectToolPermissions[]>([])
+  const [removingTool, setRemovingTool] = useState<string | null>(null)  // "path::tool"
+  const [toolError, setToolError] = useState<string | null>(null)
+  const [addToolProject, setAddToolProject] = useState('')
+  const [addToolSpec, setAddToolSpec] = useState('')
+  const [addingTool, setAddingTool] = useState(false)
+  const [showAddToolForm, setShowAddToolForm] = useState(false)
+
   useEffect(() => { window.gridwatchAPI.hasToken().then(setHasToken) }, [])
 
   const loadDirs = useCallback(async () => {
@@ -124,6 +134,53 @@ function SettingsPage({ settings, onChange }: Props) {
     setRemovingDir(null)
   }, [loadDirs])
 
+  const loadToolPerms = useCallback(async () => {
+    try {
+      const data = await window.gridwatchAPI.getToolPermissions()
+      setToolPerms(data)
+    } catch { /* ignore */ }
+  }, [])
+
+  useEffect(() => { loadToolPerms() }, [loadToolPerms])
+
+  const handleRemoveTool = useCallback(async (projectPath: string, toolSpec: string) => {
+    const key = `${projectPath}::${toolSpec}`
+    setRemovingTool(key)
+    setToolError(null)
+    try {
+      const result = await window.gridwatchAPI.removeToolPermission(projectPath, toolSpec)
+      if (result.ok) {
+        await loadToolPerms()
+      } else if (result.error) {
+        setToolError(result.error)
+      }
+    } catch { /* ignore */ }
+    setRemovingTool(null)
+  }, [loadToolPerms])
+
+  const handleAddTool = useCallback(async () => {
+    const projectPath = addToolProject.trim()
+    const toolSpec = addToolSpec.trim()
+    if (!projectPath || !toolSpec) {
+      setToolError('Project path and tool specification are required')
+      return
+    }
+    setAddingTool(true)
+    setToolError(null)
+    try {
+      const result = await window.gridwatchAPI.allowTool(projectPath, toolSpec)
+      if (result.ok) {
+        await loadToolPerms()
+        setAddToolSpec('')
+        setAddToolProject('')
+        setShowAddToolForm(false)
+      } else if (result.error) {
+        setToolError(result.error)
+      }
+    } catch { /* ignore */ }
+    setAddingTool(false)
+  }, [addToolProject, addToolSpec, loadToolPerms])
+
   const update = (patch: Partial<AppSettings>) => {
     const next = { ...settings, ...patch }
     onChange(next)
@@ -133,6 +190,13 @@ function SettingsPage({ settings, onChange }: Props) {
 
   const reset = () => {
     update({ ...DEFAULT_SETTINGS })
+  }
+
+  function toolSpecKind(spec: string): 'shell' | 'write' | 'mcp' | 'other' {
+    if (spec === 'write') return 'write'
+    if (spec === 'shell' || spec.startsWith('shell(')) return 'shell'
+    if (spec.includes('(')) return 'mcp'
+    return 'other'
   }
 
   return (
@@ -317,6 +381,112 @@ function SettingsPage({ settings, onChange }: Props) {
         >
           {addingDir ? 'ADDING…' : '+ ADD DIRECTORY'}
         </button>
+      </div>
+
+      {/* Allowed Tools */}
+      <div className={styles.panel}>
+        <div className={styles.sectionTitle}>ALLOWED TOOLS</div>
+        <div className={styles.description}>
+          Tools that Copilot CLI can use without prompting, organised by project. Stored in{' '}
+          <code style={{ color: 'var(--tron-cyan)', fontSize: 'inherit' }}>~/.copilot/permissions-config.json</code>.
+          Removing a tool resets it to "ask again" in future sessions.
+        </div>
+
+        {toolError && (
+          <div className={styles.toolError}>
+            {toolError}
+            <button
+              className={styles.toolErrorDismiss}
+              onClick={() => setToolError(null)}
+              aria-label="Dismiss error"
+            >×</button>
+          </div>
+        )}
+
+        {toolPerms.length === 0 ? (
+          <div className={styles.toolEmpty}>No tool permissions configured</div>
+        ) : (
+          <div className={styles.toolProjectList}>
+            {toolPerms.map((proj) => (
+              <div key={proj.projectPath} className={styles.toolProject}>
+                <div className={styles.toolProjectPath} title={proj.projectPath}>
+                  {proj.projectPath}
+                </div>
+                <div className={styles.toolChips}>
+                  {proj.allowedTools.map((tool) => {
+                    const kind = toolSpecKind(tool)
+                    const key = `${proj.projectPath}::${tool}`
+                    return (
+                      <span
+                        key={tool}
+                        className={`${styles.toolChip} ${styles[`toolChip_${kind}`]}`}
+                      >
+                        {tool}
+                        <button
+                          className={styles.toolChipRemove}
+                          onClick={() => handleRemoveTool(proj.projectPath, tool)}
+                          disabled={removingTool === key}
+                          title={`Remove permission for ${tool}`}
+                          aria-label={`Remove ${tool} from allowed tools for ${proj.projectPath}`}
+                        >
+                          {removingTool === key ? '…' : '×'}
+                        </button>
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {showAddToolForm ? (
+          <div className={styles.toolAddForm}>
+            <div className={styles.toolAddRow}>
+              <input
+                className={styles.toolAddInput}
+                type="text"
+                placeholder="Project path (e.g. /Users/you/project)"
+                value={addToolProject}
+                onChange={(e) => setAddToolProject(e.target.value)}
+                spellCheck={false}
+                autoComplete="off"
+              />
+            </div>
+            <div className={styles.toolAddRow}>
+              <input
+                className={styles.toolAddInput}
+                type="text"
+                placeholder="Tool spec (e.g. write, shell(git), mcp-server(tool))"
+                value={addToolSpec}
+                onChange={(e) => setAddToolSpec(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { void handleAddTool() } }}
+                spellCheck={false}
+                autoComplete="off"
+              />
+              <button
+                className={styles.toolAddBtn}
+                onClick={handleAddTool}
+                disabled={addingTool}
+              >
+                {addingTool ? 'ADDING…' : 'ADD'}
+              </button>
+              <button
+                className={styles.toolCancelBtn}
+                onClick={() => { setShowAddToolForm(false); setAddToolSpec(''); setAddToolProject(''); setToolError(null) }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            className={styles.dirAddBtn}
+            onClick={() => setShowAddToolForm(true)}
+          >
+            + ADD TOOL PERMISSION
+          </button>
+        )}
       </div>
 
       {/* Reset */}
