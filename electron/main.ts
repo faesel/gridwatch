@@ -979,7 +979,7 @@ ipcMain.handle('app:open-item-folder', async (_e, type: string, name: string) =>
       target = path.join(copilotBase, 'agents', `${name}.agent.md`)
       break
     case 'dirs':
-      target = allowedDirsPath
+      target = copilotConfigPath
       break
     default:
       throw new Error(`Unknown item type: ${type}`)
@@ -2003,7 +2003,7 @@ ipcMain.handle('lsp:toggle-server', async (_e, serverName: string): Promise<{ ok
 
 // ── Allowed Directories IPC ──────────────────────────────────────────────────
 
-const allowedDirsPath = path.join(os.homedir(), '.copilot', 'gridwatch-allowed-dirs.json')
+const copilotConfigPath = path.join(os.homedir(), '.copilot', 'config.json')
 let allowedDirsCache: { data: AllowedDirectory[]; timestamp: number } | null = null
 const DIRS_CACHE_TTL = 10_000
 
@@ -2025,26 +2025,38 @@ function isValidDirPath(p: unknown): p is string {
   return true
 }
 
-function readAllowedDirs(): { path: string; addedAt: string }[] {
-  if (!fs.existsSync(allowedDirsPath)) return []
+/** Read the Copilot CLI config.json, stripping leading comments */
+function readCopilotConfig(): Record<string, unknown> {
+  if (!fs.existsSync(copilotConfigPath)) return {}
   try {
-    const raw = fs.readFileSync(allowedDirsPath, 'utf-8')
-    const parsed = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.directories)) return []
-    return parsed.directories.filter(
-      (d: unknown): d is { path: string; addedAt: string } =>
-        d !== null &&
-        typeof d === 'object' &&
-        isValidDirPath((d as Record<string, unknown>).path) &&
-        typeof (d as Record<string, unknown>).addedAt === 'string',
-    )
+    const raw = fs.readFileSync(copilotConfigPath, 'utf-8')
+    // config.json may have leading // comments — strip them before parsing
+    const jsonStr = raw.replace(/^\s*\/\/[^\n]*\n/gm, '')
+    const parsed = JSON.parse(jsonStr)
+    if (!parsed || typeof parsed !== 'object') return {}
+    return parsed as Record<string, unknown>
   } catch {
-    return []
+    return {}
   }
 }
 
-function writeAllowedDirs(dirs: { path: string; addedAt: string }[]): void {
-  fs.writeFileSync(allowedDirsPath, JSON.stringify({ directories: dirs }, null, 2) + '\n', 'utf-8')
+/** Write back to config.json preserving the leading comment */
+function writeCopilotConfig(config: Record<string, unknown>): void {
+  const comment = '// User settings belong in settings.json.\n// This file is managed automatically.\n'
+  fs.writeFileSync(copilotConfigPath, comment + JSON.stringify(config, null, 2) + '\n', 'utf-8')
+}
+
+function readTrustedFolders(): string[] {
+  const config = readCopilotConfig()
+  const folders = config.trustedFolders
+  if (!Array.isArray(folders)) return []
+  return folders.filter((f): f is string => isValidDirPath(f))
+}
+
+function writeTrustedFolders(folders: string[]): void {
+  const config = readCopilotConfig()
+  config.trustedFolders = folders
+  writeCopilotConfig(config)
 }
 
 ipcMain.handle('dirs:get-all', async (): Promise<AllowedDirectory[]> => {
@@ -2052,11 +2064,11 @@ ipcMain.handle('dirs:get-all', async (): Promise<AllowedDirectory[]> => {
     return allowedDirsCache.data
   }
   try {
-    const raw = readAllowedDirs()
-    const data: AllowedDirectory[] = raw.map((d) => ({
-      path: d.path,
-      addedAt: d.addedAt,
-      exists: fs.existsSync(d.path),
+    const folders = readTrustedFolders()
+    const data: AllowedDirectory[] = folders.map((p) => ({
+      path: p,
+      addedAt: '',
+      exists: fs.existsSync(p),
     }))
     allowedDirsCache = { data, timestamp: Date.now() }
     return data
@@ -2069,7 +2081,7 @@ ipcMain.handle('dirs:add', async (): Promise<{ ok: boolean; directory?: AllowedD
   if (!win) return { ok: false, error: 'No window available' }
   try {
     const { canceled, filePaths } = await dialog.showOpenDialog(win, {
-      title: 'Add Allowed Directory',
+      title: 'Add Trusted Directory',
       properties: ['openDirectory', 'createDirectory'],
     })
     if (canceled || !filePaths.length) return { ok: false, error: 'Cancelled' }
@@ -2090,18 +2102,17 @@ ipcMain.handle('dirs:add', async (): Promise<{ ok: boolean; directory?: AllowedD
       return { ok: false, error: 'Selected path is not a directory' }
     }
 
-    const existing = readAllowedDirs()
-    if (existing.some((d) => d.path === selected)) {
-      return { ok: false, error: 'Directory is already in the allowed list' }
+    const existing = readTrustedFolders()
+    if (existing.includes(selected)) {
+      return { ok: false, error: 'Directory is already in the trusted list' }
     }
 
-    const entry = { path: selected, addedAt: new Date().toISOString() }
-    writeAllowedDirs([...existing, entry])
+    writeTrustedFolders([...existing, selected])
     allowedDirsCache = null
 
     return {
       ok: true,
-      directory: { path: selected, addedAt: entry.addedAt, exists: true },
+      directory: { path: selected, addedAt: '', exists: true },
     }
   } catch (err) {
     return { ok: false, error: (err as Error).message }
@@ -2117,17 +2128,13 @@ ipcMain.handle('dirs:remove', async (_e, dirPath: string): Promise<{ ok: boolean
       return { ok: false, error: 'Invalid directory path' }
     }
 
-    const existing = readAllowedDirs()
-    const next = existing.filter((d) => d.path !== dirPath)
+    const existing = readTrustedFolders()
+    const next = existing.filter((p) => p !== dirPath)
     if (next.length === existing.length) {
-      return { ok: false, error: 'Directory not found in allowed list' }
+      return { ok: false, error: 'Directory not found in trusted list' }
     }
 
-    if (next.length === 0) {
-      if (fs.existsSync(allowedDirsPath)) fs.unlinkSync(allowedDirsPath)
-    } else {
-      writeAllowedDirs(next)
-    }
+    writeTrustedFolders(next)
     allowedDirsCache = null
     return { ok: true }
   } catch (err) {

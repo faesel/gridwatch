@@ -1,4 +1,5 @@
-import { useState, useEffect, memo } from 'react'
+import { useState, useEffect, useCallback, memo } from 'react'
+import type { AllowedDirectory } from '../types/dirs'
 import styles from './SettingsPage.module.css'
 
 export interface AppSettings {
@@ -79,8 +80,49 @@ interface Props {
 function SettingsPage({ settings, onChange }: Props) {
   const [tokenInput, setTokenInput] = useState('')
   const [hasToken, setHasToken] = useState(false)
+  const [dirs, setDirs] = useState<AllowedDirectory[]>([])
+  const [addingDir, setAddingDir] = useState(false)
+  const [removingDir, setRemovingDir] = useState<string | null>(null)
+  const [dirError, setDirError] = useState<string | null>(null)
 
   useEffect(() => { window.gridwatchAPI.hasToken().then(setHasToken) }, [])
+
+  const loadDirs = useCallback(async () => {
+    try {
+      const data = await window.gridwatchAPI.getAllowedDirs()
+      setDirs(data)
+    } catch { /* ignore */ }
+  }, [])
+
+  useEffect(() => { loadDirs() }, [loadDirs])
+
+  const handleAddDir = useCallback(async () => {
+    setAddingDir(true)
+    setDirError(null)
+    try {
+      const result = await window.gridwatchAPI.addAllowedDir()
+      if (result.ok) {
+        await loadDirs()
+      } else if (result.error && result.error !== 'Cancelled') {
+        setDirError(result.error)
+      }
+    } catch { /* ignore */ }
+    setAddingDir(false)
+  }, [loadDirs])
+
+  const handleRemoveDir = useCallback(async (dirPath: string) => {
+    setRemovingDir(dirPath)
+    setDirError(null)
+    try {
+      const result = await window.gridwatchAPI.removeAllowedDir(dirPath)
+      if (result.ok) {
+        await loadDirs()
+      } else if (result.error) {
+        setDirError(result.error)
+      }
+    } catch { /* ignore */ }
+    setRemovingDir(null)
+  }, [loadDirs])
 
   const update = (patch: Partial<AppSettings>) => {
     const next = { ...settings, ...patch }
@@ -225,6 +267,56 @@ function SettingsPage({ settings, onChange }: Props) {
           )}
         </div>
         {hasToken && <div className={styles.apiKeyStatus}>✓ TOKEN SAVED</div>}
+      </div>
+
+      {/* Trusted Directories */}
+      <div className={styles.panel}>
+        <div className={styles.sectionTitle}>TRUSTED DIRECTORIES</div>
+        <div className={styles.description}>
+          Directories that Copilot CLI can access without prompting. Stored in <code style={{ color: 'var(--tron-cyan)', fontSize: 'inherit' }}>~/.copilot/config.json</code> under <code style={{ color: 'var(--tron-cyan)', fontSize: 'inherit' }}>trustedFolders</code>.
+        </div>
+
+        {dirError && (
+          <div className={styles.dirError}>
+            {dirError}
+            <button
+              className={styles.dirErrorDismiss}
+              onClick={() => setDirError(null)}
+              aria-label="Dismiss error"
+            >×</button>
+          </div>
+        )}
+
+        <div className={styles.dirList}>
+          {dirs.length === 0 && (
+            <div className={styles.dirEmpty}>No trusted directories configured</div>
+          )}
+          {dirs.map((d) => (
+            <div key={d.path} className={styles.dirRow}>
+              <span className={styles.dirPath} title={d.path}>{d.path}</span>
+              <span className={d.exists ? styles.dirExists : styles.dirMissing}>
+                {d.exists ? '✓' : '✗'}
+              </span>
+              <button
+                className={styles.dirRemoveBtn}
+                onClick={() => handleRemoveDir(d.path)}
+                disabled={removingDir === d.path}
+                title="Remove from trusted list"
+                aria-label={`Remove ${d.path} from trusted directories`}
+              >
+                {removingDir === d.path ? '…' : '✕'}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <button
+          className={styles.dirAddBtn}
+          onClick={handleAddDir}
+          disabled={addingDir}
+        >
+          {addingDir ? 'ADDING…' : '+ ADD DIRECTORY'}
+        </button>
       </div>
 
       {/* Reset */}
