@@ -24,6 +24,7 @@ GridWatch reads the local session data written by [GitHub Copilot CLI](https://g
   - [Available scripts](#-available-scripts)
   - [Data sources](#-data-sources)
   - [Security](#-security)
+  - [Settings](#%EF%B8%8F-settings)
   - [Tech stack](#%EF%B8%8F-tech-stack)
   - [Design system](#-design-system)
 - [Releasing](#-releasing)
@@ -54,7 +55,7 @@ GridWatch reads the local session data written by [GitHub Copilot CLI](https://g
 - 🗑️ **Archive / Delete** — safely archive or permanently remove old sessions (guards against deleting active sessions)
 - 📂 **Open in folder** — reveal research reports and modified files in Finder (macOS) or Explorer (Windows)
 - 🔔 **Update notifications** — automatically checks GitHub Releases for new versions and shows a download banner
-- ⚙️ **Settings** — adjustable UI scale, font size, and density presets, persisted between launches
+- ⚙️ **Settings** — adjustable UI scale, font size, density, theme, and Copilot CLI configuration management
 - 🔄 **Auto-refresh** — dashboard refreshes every 30 seconds automatically
 - 🎨 **Retro Tron theme** — neon cyan, electric blue, and orange accents on near-black backgrounds with JetBrains Mono typography
 
@@ -226,6 +227,7 @@ GridWatch reads exclusively from local files — no network requests are made ex
 | MCP server config        | `~/.copilot/mcp-config.json`                                                                    |
 | LSP server config        | `~/.copilot/lsp-config.json`                                                                    |
 | Custom agent profiles    | `~/.copilot/agents/<name>.agent.md` (read-only — agent profiles with YAML frontmatter)          |
+| Trusted directories      | `~/.copilot/config.json` → `trustedFolders` array                                               |
 
 **GridWatch-specific files (created and managed by GridWatch):**
 
@@ -263,6 +265,31 @@ GridWatch reads exclusively from local files — no network requests are made ex
 - **LSP config management** — GridWatch reads and writes `~/.copilot/lsp-config.json` to enable/disable language servers but never spawns or executes LSP server processes. Toggle operations use the same prototype pollution guards and `hasOwnProperty` checks as MCP
 - **Dev build guard** — packaged builds detect and refuse to run if a Vite dev server URL is present, preventing accidental distribution of builds with a relaxed Content Security Policy
 - **Hardened runtime** — macOS builds use hardened runtime for notarization compatibility
+
+### ⚙️ Settings
+
+The Settings page provides UI preferences and Copilot CLI configuration management, all persisted between launches.
+
+**Display preferences** (stored in `localStorage`):
+
+| Setting   | Description                                      | Options                              |
+| --------- | ------------------------------------------------ | ------------------------------------ |
+| UI Scale  | Scales the entire interface via Electron webFrame | XS (80%) – 2XL (135%)               |
+| Font Size | Base text size independent of scale               | 10px – 16px                          |
+| Density   | Padding and spacing between elements              | Compact / Default / Comfortable      |
+| Theme     | Colour scheme                                     | The Grid (cyan/blue) / Programs (red) |
+
+**Copilot CLI configuration** (stored in `~/.copilot/config.json`):
+
+| Setting              | Description                                                                      | Config key       |
+| -------------------- | -------------------------------------------------------------------------------- | ---------------- |
+| Trusted Directories  | Directories Copilot CLI can access without the startup trust prompt. Add/remove via folder picker or edit `config.json` directly | `trustedFolders` |
+
+**Other:**
+
+| Setting                      | Description                                                              |
+| ---------------------------- | ------------------------------------------------------------------------ |
+| GitHub Personal Access Token | Required for the Insights tab (GitHub Models API). Encrypted at rest via OS keychain |
 
 ### ⚙️ Tech stack
 
