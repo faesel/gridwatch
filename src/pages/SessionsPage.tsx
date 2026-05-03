@@ -5,6 +5,7 @@ import styles from './SessionsPage.module.css'
 
 const PAGE_SIZE = 20
 const SEARCH_DEBOUNCE_MS = 250
+const UNDO_TOAST_DURATION_MS = 5000
 
 interface Props {
   sessions: SessionSummary[]
@@ -89,6 +90,13 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
   const [expandedCompactions, setExpandedCompactions] = useState<Set<number>>(new Set())
   const msgRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
+  // Tool permissions for the selected session's project
+  const [allowedToolsForSession, setAllowedToolsForSession] = useState<Set<string>>(new Set())
+  const [confirmAllowTool, setConfirmAllowTool] = useState<string | null>(null)
+  const [allowingTool, setAllowingTool] = useState(false)
+  const [undoTool, setUndoTool] = useState<string | null>(null)
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const measureOverflow = useCallback((key: string, el: HTMLDivElement | null) => {
     if (el) {
       msgRefs.current.set(key, el)
@@ -117,6 +125,11 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
     return () => clearTimeout(timer)
   }, [search])
 
+  // Prevent memory leaks from pending undo timers when the component unmounts
+  useEffect(() => {
+    return () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current) }
+  }, [])
+
   // Sync localTags, localNotes, and transfers when selected session changes
   useEffect(() => {
     setLocalTags(selectedSession?.tags ?? [])
@@ -128,6 +141,10 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
     setOverflowingMsgs(new Set())
     setExpandedCompactions(new Set())
     setSessionDetail(null)
+    setConfirmAllowTool(null)
+    setUndoTool(null)
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+    setAllowedToolsForSession(new Set())
     if (selectedSession) {
       window.gridwatchAPI.listTransfers(selectedSession.id).then(setTransfers)
       // Lazy-load expensive detail fields
@@ -136,6 +153,13 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
         .then(detail => setSessionDetail(detail))
         .catch(() => {})
         .finally(() => setDetailLoading(false))
+      // Load allowed tools for this session's working directory
+      window.gridwatchAPI.getToolPermissions()
+        .then((perms) => {
+          const proj = perms.find((p) => p.projectPath === selectedSession.cwd)
+          setAllowedToolsForSession(new Set(proj?.allowedTools ?? []))
+        })
+        .catch(() => {})
     }
   }, [selectedSession?.id])
 
@@ -239,6 +263,35 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
       setActionError(result.error || 'Delete failed')
       setConfirm(null)
     }
+  }
+
+  const handleAllowTool = async (toolSpec: string) => {
+    if (!selectedSession) return
+    setAllowingTool(true)
+    try {
+      const result = await window.gridwatchAPI.allowTool(selectedSession.cwd, toolSpec)
+      if (result.ok) {
+        setAllowedToolsForSession((prev) => new Set([...prev, toolSpec]))
+        setConfirmAllowTool(null)
+        setUndoTool(toolSpec)
+        if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+        undoTimerRef.current = setTimeout(() => setUndoTool(null), UNDO_TOAST_DURATION_MS)
+      }
+    } catch { /* ignore */ }
+    setAllowingTool(false)
+  }
+
+  const handleUndoAllow = async () => {
+    if (!selectedSession || !undoTool) return
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+    const spec = undoTool
+    setUndoTool(null)
+    await window.gridwatchAPI.removeToolPermission(selectedSession.cwd, spec).catch(() => {})
+    setAllowedToolsForSession((prev) => {
+      const next = new Set(prev)
+      next.delete(spec)
+      return next
+    })
   }
 
   // Collect all unique tags across sessions
@@ -618,10 +671,56 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
           {selectedSession.toolsUsed.length > 0 && (
             <div className={styles.section}>
               <div className={styles.sectionTitle}>TOOLS USED</div>
+
+              {/* Undo toast */}
+              {undoTool && (
+                <div className={styles.toolUndoToast}>
+                  <span>✓ <code style={{ fontSize: 'inherit' }}>{undoTool}</code> added to allowed tools</span>
+                  <button className={styles.toolUndoBtn} onClick={handleUndoAllow}>UNDO</button>
+                </div>
+              )}
+
+              {/* Confirm allow dialog */}
+              {confirmAllowTool && (
+                <div className={styles.toolConfirmBox}>
+                  <span>
+                    Allow <code style={{ fontSize: 'inherit' }}>{confirmAllowTool}</code> for this project?
+                    Copilot will use it without asking in future sessions.
+                  </span>
+                  <div className={styles.toolConfirmActions}>
+                    <button
+                      className={styles.toolConfirmBtn}
+                      onClick={() => void handleAllowTool(confirmAllowTool)}
+                      disabled={allowingTool}
+                    >
+                      {allowingTool ? '…' : 'ALLOW'}
+                    </button>
+                    <button
+                      className={styles.toolConfirmCancelBtn}
+                      onClick={() => setConfirmAllowTool(null)}
+                    >
+                      CANCEL
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className={styles.toolBadges}>
-                {selectedSession.toolsUsed.map((tool) => (
-                  <span key={tool} className={styles.toolBadge}>{tool}</span>
-                ))}
+                {selectedSession.toolsUsed.map((tool) => {
+                  const isAllowed = allowedToolsForSession.has(tool)
+                  return (
+                    <button
+                      key={tool}
+                      className={`${styles.toolBadge} ${isAllowed ? styles.toolBadgeAllowed : ''}`}
+                      onClick={() => { if (!isAllowed) setConfirmAllowTool(tool) }}
+                      disabled={isAllowed}
+                      title={isAllowed ? 'Already in allowed tools list' : 'Click to add to allowed tools'}
+                      aria-label={isAllowed ? `${tool} (allowed)` : `Add ${tool} to allowed tools`}
+                    >
+                      {tool}{isAllowed ? ' ✓' : ''}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}

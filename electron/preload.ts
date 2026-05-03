@@ -79,6 +79,13 @@ contextBridge.exposeInMainWorld('gridwatchAPI', {
   addAllowedDir: () => ipcRenderer.invoke('dirs:add'),
   removeAllowedDir: (dirPath: string) => ipcRenderer.invoke('dirs:remove', dirPath),
 
+  // Tool Permissions
+  getToolPermissions: () => ipcRenderer.invoke('tools:get-permissions'),
+  allowTool: (projectPath: string, toolSpec: string) =>
+    ipcRenderer.invoke('tools:allow-tool', projectPath, toolSpec),
+  removeToolPermission: (projectPath: string, toolSpec: string) =>
+    ipcRenderer.invoke('tools:remove-tool', projectPath, toolSpec),
+
   // Window controls
   getPlatform: () => ipcRenderer.invoke('app:get-platform'),
   windowMinimize: () => ipcRenderer.invoke('window:minimize'),
