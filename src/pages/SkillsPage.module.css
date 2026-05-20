@@ -69,6 +69,41 @@
   border-color: var(--tron-cyan);
 }
 
+.bulkToggleWrap {
+  padding: 0 12px 6px;
+}
+
+.bulkToggleBtn {
+  width: 100%;
+  background: var(--tron-panel);
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text-dim);
+  font-family: inherit;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 5px 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.bulkToggleBtn:hover:not(:disabled) {
+  border-color: var(--tron-cyan);
+}
+
+.bulkToggleBtnEnable {
+  color: var(--tron-cyan);
+}
+
+.bulkToggleBtnDisable {
+  color: var(--tron-orange);
+  border-color: color-mix(in srgb, var(--tron-orange) 40%, var(--tron-border));
+}
+
+.bulkToggleBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .list {
   flex: 1;
   overflow-y: auto;
