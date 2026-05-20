@@ -145,7 +145,12 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
   useEffect(() => {
     if (!selectedIdRef.current) return
     const updated = sessions.find(s => s.id === selectedIdRef.current)
-    if (updated && updated.updatedAt !== selectedSession?.updatedAt) setSelectedSession(updated)
+    if (
+      updated &&
+      (updated.updatedAt !== selectedSession?.updatedAt ||
+        updated.summary !== selectedSession?.summary ||
+        updated.tags !== selectedSession?.tags)
+    ) setSelectedSession(updated)
   }, [sessions])
 
   const startRename = () => {
