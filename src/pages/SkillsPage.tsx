@@ -321,6 +321,15 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
         <div className={styles.toolbar}>
           <button className={styles.toolbarBtn} onClick={openCreateDialog}>+ NEW</button>
           <button className={styles.toolbarBtn} onClick={handleImport}>↓ IMPORT</button>
+          {!loading && (
+            <button
+              className={`${styles.toolbarBtn} ${allVisibleSkillsEnabled ? styles.toolbarBtnDestructive : ''}`}
+              onClick={handleToggleVisible}
+              disabled={!hasVisibleSkills}
+            >
+              {allVisibleSkillsEnabled ? '○ DISABLE ALL' : '● ENABLE ALL'}
+            </button>
+          )}
         </div>
         <div className={styles.searchWrap}>
           <input
@@ -355,17 +364,6 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
                 CLEAR
               </button>
             )}
-          </div>
-        )}
-        {!loading && (
-          <div className={styles.bulkToggleWrap}>
-            <button
-              className={`${styles.bulkToggleBtn} ${allVisibleSkillsEnabled ? styles.bulkToggleBtnDisable : styles.bulkToggleBtnEnable}`}
-              onClick={handleToggleVisible}
-              disabled={!hasVisibleSkills}
-            >
-              {allVisibleSkillsEnabled ? '○ DISABLE ALL VISIBLE' : '● ENABLE ALL VISIBLE'}
-            </button>
           </div>
         )}
         {!loading && totalEnabledTokens > 0 && (
