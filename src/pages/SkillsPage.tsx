@@ -131,6 +131,9 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
       || (s.tags ?? []).some((t) => t.toLowerCase().includes(q))
   }), [skills, selectedTags, search])
 
+  const hasVisibleSkills = filtered.length > 0
+  const allVisibleSkillsEnabled = hasVisibleSkills && filtered.every((s) => s.enabled)
+
   const handleSelectSkill = (skill: SkillData) => {
     if (unsaved && !confirm('You have unsaved changes. Discard?')) return
     setSelected(skill)
@@ -163,6 +166,29 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
     } else {
       setActionError(result.error ?? 'Toggle failed')
     }
+  }
+
+  const handleToggleVisible = async () => {
+    const visibleSkills = filtered
+    if (visibleSkills.length === 0) return
+
+    const shouldDisable = visibleSkills.every((s) => s.enabled)
+    const skillsToToggle = shouldDisable
+      ? visibleSkills.filter((s) => s.enabled)
+      : visibleSkills.filter((s) => !s.enabled)
+
+    if (skillsToToggle.length === 0) return
+
+    const results = await Promise.all(
+      skillsToToggle.map((skill) => window.gridwatchAPI.toggleSkill(skill.name))
+    )
+    const failed = results.find((result) => !result.ok)
+
+    if (failed) {
+      setActionError(failed.error ?? `Failed to ${shouldDisable ? 'disable' : 'enable'} all visible skills`)
+    }
+
+    await loadSkills()
   }
 
   const handleExport = async () => {
@@ -295,6 +321,15 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
         <div className={styles.toolbar}>
           <button className={styles.toolbarBtn} onClick={openCreateDialog}>+ NEW</button>
           <button className={styles.toolbarBtn} onClick={handleImport}>↓ IMPORT</button>
+          {!loading && (
+            <button
+              className={`${styles.toolbarBtn} ${allVisibleSkillsEnabled ? styles.toolbarBtnDestructive : ''}`}
+              onClick={handleToggleVisible}
+              disabled={!hasVisibleSkills}
+            >
+              {allVisibleSkillsEnabled ? '○ DISABLE ALL' : '● ENABLE ALL'}
+            </button>
+          )}
         </div>
         <div className={styles.searchWrap}>
           <input

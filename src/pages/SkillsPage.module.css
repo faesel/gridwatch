@@ -40,9 +40,24 @@
   transition: all 0.15s;
 }
 
-.toolbarBtn:hover {
+.toolbarBtn:hover:not(:disabled) {
   border-color: var(--tron-cyan);
   box-shadow: var(--tron-glow-cyan);
+}
+
+.toolbarBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.toolbarBtnDestructive {
+  color: var(--tron-orange);
+  border-color: color-mix(in srgb, var(--tron-orange) 40%, var(--tron-border));
+}
+
+.toolbarBtnDestructive:hover:not(:disabled) {
+  border-color: var(--tron-orange);
+  box-shadow: var(--tron-glow-orange);
 }
 
 .searchWrap {
