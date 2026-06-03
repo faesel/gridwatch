@@ -258,7 +258,7 @@ GridWatch reads exclusively from local files — no network requests are made ex
 - **URL restriction** — `shell.openExternal` limited to HTTP(S) URLs only
 - **Navigation guards** — `will-navigate` and `setWindowOpenHandler` prevent the Electron window from being redirected to external origins
 - **Token isolation** — the GitHub PAT never leaves the main process. The renderer only knows whether a token exists (`hasToken`); API calls that require authentication are made entirely within main, keeping the token out of the renderer's JavaScript heap
-- **Input size limits** — freeform IPC inputs are capped to prevent a renderer bug from writing unbounded data to disk. Session summaries are limited to 1,000 characters, session notes to 100,000 characters, and skill file content to 512KB. Skill filenames are restricted to `.md` extensions only
+- **Input size limits** — freeform IPC inputs are capped to prevent a renderer bug from writing unbounded data to disk. Session summary, session notes, and skill file caps are configurable from Settings (with safe ranges and defaults matching previous releases). Skill filenames are restricted to `.md` extensions only
 - **HTTP response caps** — outbound HTTP responses (update checks, GitHub Models API) are capped at 1MB. If a response exceeds this limit, the stream is destroyed immediately. This prevents a compromised or misbehaving endpoint from exhausting main process memory
 - **MCP tool discovery** — GridWatch reads your `~/.copilot/mcp-config.json` and briefly spawns each configured local MCP server to query its tool list via JSON-RPC. GridWatch does not install or modify MCP servers — it only reads what you have already configured. Commands with shell metacharacters are rejected as a safety measure
 - **Prototype pollution guards** — object property keys sourced from external config (e.g. MCP server names, LSP server names) are validated against known dangerous keys (`__proto__`, `constructor`, `prototype`) and use `hasOwnProperty` checks to prevent prototype chain corruption
@@ -278,6 +278,9 @@ The Settings page provides UI preferences and Copilot CLI configuration manageme
 | Font Size | Base text size independent of scale               | 10px – 16px                          |
 | Density   | Padding and spacing between elements              | Compact / Default / Comfortable      |
 | Theme     | Colour scheme                                     | The Grid (cyan/blue) / Programs (red) |
+| Summary max length | Maximum session summary length passed over IPC | 100 – 5,000 chars (default 1,000) |
+| Notes max length | Maximum session notes length passed over IPC | 10,000 – 500,000 chars (default 100,000) |
+| Skill file max size | Maximum skill markdown file size passed over IPC | 64KB – 2MB (default 512KB) |
 
 **Copilot CLI configuration** (stored in `~/.copilot/config.json`):
 

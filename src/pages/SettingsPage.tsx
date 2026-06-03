@@ -7,13 +7,23 @@ export interface AppSettings {
   fontSize: number    // 10 – 16 (px, overrides body font-size)
   spacing: 'compact' | 'default' | 'comfortable'
   theme: 'grid' | 'programs'
+  summaryMaxLength: number
+  notesMaxLength: number
+  skillFileMaxBytes: number
 }
+
+const SUMMARY_LIMIT_RANGE = { min: 100, max: 5_000, defaultValue: 1_000 } as const
+const NOTES_LIMIT_RANGE = { min: 10_000, max: 500_000, defaultValue: 100_000 } as const
+const SKILL_SIZE_LIMIT_RANGE = { min: 65_536, max: 2_097_152, defaultValue: 524_288 } as const
 
 export const DEFAULT_SETTINGS: AppSettings = {
   zoom: 1.0,
   fontSize: 13,
   spacing: 'default',
   theme: 'grid',
+  summaryMaxLength: SUMMARY_LIMIT_RANGE.defaultValue,
+  notesMaxLength: NOTES_LIMIT_RANGE.defaultValue,
+  skillFileMaxBytes: SKILL_SIZE_LIMIT_RANGE.defaultValue,
 }
 
 const STORAGE_KEY = 'gridwatch-settings'
@@ -22,11 +32,43 @@ async function saveApiKey(key: string): Promise<void> {
   try { await window.gridwatchAPI.saveToken(key) } catch { /* ignore */ }
 }
 
+function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  const rounded = Math.round(value)
+  return Math.min(max, Math.max(min, rounded))
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(2)} MB`
+  return `${Math.round(bytes / 1024)} KB`
+}
+
 export function loadSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { ...DEFAULT_SETTINGS }
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) }
+    const merged = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } as AppSettings
+    return {
+      ...merged,
+      summaryMaxLength: clampNumber(
+        merged.summaryMaxLength,
+        SUMMARY_LIMIT_RANGE.min,
+        SUMMARY_LIMIT_RANGE.max,
+        DEFAULT_SETTINGS.summaryMaxLength,
+      ),
+      notesMaxLength: clampNumber(
+        merged.notesMaxLength,
+        NOTES_LIMIT_RANGE.min,
+        NOTES_LIMIT_RANGE.max,
+        DEFAULT_SETTINGS.notesMaxLength,
+      ),
+      skillFileMaxBytes: clampNumber(
+        merged.skillFileMaxBytes,
+        SKILL_SIZE_LIMIT_RANGE.min,
+        SKILL_SIZE_LIMIT_RANGE.max,
+        DEFAULT_SETTINGS.skillFileMaxBytes,
+      ),
+    }
   } catch {
     return { ...DEFAULT_SETTINGS }
   }
@@ -45,6 +87,11 @@ export function applySettings(s: AppSettings): void {
   document.documentElement.style.setProperty('--font-scale', String(s.fontSize / 13))
   document.documentElement.setAttribute('data-density', s.spacing)
   document.documentElement.setAttribute('data-theme', s.theme ?? 'grid')
+  window.gridwatchAPI.setInputCaps({
+    summaryMaxLength: s.summaryMaxLength,
+    notesMaxLength: s.notesMaxLength,
+    skillFileMaxBytes: s.skillFileMaxBytes,
+  }).catch(() => {})
 }
 
 const ZOOM_PRESETS = [
@@ -133,6 +180,24 @@ function SettingsPage({ settings, onChange }: Props) {
 
   const reset = () => {
     update({ ...DEFAULT_SETTINGS })
+  }
+
+  const updateSummaryLimit = (value: string) => {
+    const parsed = Number.parseInt(value, 10)
+    if (Number.isNaN(parsed)) return
+    update({ summaryMaxLength: clampNumber(parsed, SUMMARY_LIMIT_RANGE.min, SUMMARY_LIMIT_RANGE.max, settings.summaryMaxLength) })
+  }
+
+  const updateNotesLimit = (value: string) => {
+    const parsed = Number.parseInt(value, 10)
+    if (Number.isNaN(parsed)) return
+    update({ notesMaxLength: clampNumber(parsed, NOTES_LIMIT_RANGE.min, NOTES_LIMIT_RANGE.max, settings.notesMaxLength) })
+  }
+
+  const updateSkillSizeLimit = (value: string) => {
+    const parsed = Number.parseInt(value, 10)
+    if (Number.isNaN(parsed)) return
+    update({ skillFileMaxBytes: clampNumber(parsed, SKILL_SIZE_LIMIT_RANGE.min, SKILL_SIZE_LIMIT_RANGE.max, settings.skillFileMaxBytes) })
   }
 
   return (
@@ -317,6 +382,77 @@ function SettingsPage({ settings, onChange }: Props) {
         >
           {addingDir ? 'ADDING…' : '+ ADD DIRECTORY'}
         </button>
+      </div>
+
+      {/* Input Limits */}
+      <div className={styles.panel}>
+        <div className={styles.sectionTitle}>LIMITS</div>
+        <div className={styles.description}>
+          These caps protect against unbounded disk writes from malformed renderer or IPC payloads. Defaults match prior releases.
+          The 1MB HTTP response cap remains fixed as a hard security boundary.
+        </div>
+
+        <div className={styles.limitsGrid}>
+          <div className={styles.limitRow}>
+            <div className={styles.limitInfo}>
+              <div className={styles.limitLabel}>Summary max length</div>
+              <div className={styles.limitHint}>Range: {SUMMARY_LIMIT_RANGE.min.toLocaleString()}–{SUMMARY_LIMIT_RANGE.max.toLocaleString()} chars</div>
+            </div>
+            <div className={styles.limitInputWrap}>
+              <input
+                className={styles.limitInput}
+                type="number"
+                min={SUMMARY_LIMIT_RANGE.min}
+                max={SUMMARY_LIMIT_RANGE.max}
+                value={settings.summaryMaxLength}
+                onChange={(e) => updateSummaryLimit(e.target.value)}
+              />
+              <span className={styles.limitUnit}>chars</span>
+            </div>
+          </div>
+
+          <div className={styles.limitRow}>
+            <div className={styles.limitInfo}>
+              <div className={styles.limitLabel}>Notes max length</div>
+              <div className={styles.limitHint}>Range: {NOTES_LIMIT_RANGE.min.toLocaleString()}–{NOTES_LIMIT_RANGE.max.toLocaleString()} chars</div>
+            </div>
+            <div className={styles.limitInputWrap}>
+              <input
+                className={styles.limitInput}
+                type="number"
+                min={NOTES_LIMIT_RANGE.min}
+                max={NOTES_LIMIT_RANGE.max}
+                value={settings.notesMaxLength}
+                onChange={(e) => updateNotesLimit(e.target.value)}
+              />
+              <span className={styles.limitUnit}>chars</span>
+            </div>
+          </div>
+
+          <div className={styles.limitRow}>
+            <div className={styles.limitInfo}>
+              <div className={styles.limitLabel}>Skill file max size</div>
+              <div className={styles.limitHint}>
+                Range: {formatBytes(SKILL_SIZE_LIMIT_RANGE.min)}–{formatBytes(SKILL_SIZE_LIMIT_RANGE.max)}
+              </div>
+            </div>
+            <div className={styles.limitInputWrap}>
+              <input
+                className={styles.limitInput}
+                type="number"
+                min={Math.round(SKILL_SIZE_LIMIT_RANGE.min / 1024)}
+                max={Math.round(SKILL_SIZE_LIMIT_RANGE.max / 1024)}
+                value={Math.round(settings.skillFileMaxBytes / 1024)}
+                onChange={(e) => {
+                  const parsed = Number.parseInt(e.target.value, 10)
+                  if (Number.isNaN(parsed)) return
+                  updateSkillSizeLimit(String(parsed * 1024))
+                }}
+              />
+              <span className={styles.limitUnit}>KB</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Reset */}

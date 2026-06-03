@@ -48,6 +48,15 @@ declare global {
       openItemFolder: (type: 'session' | 'skill' | 'mcp' | 'agent' | 'lsp' | 'dirs', name: string) => Promise<void>;
       saveToken: (token: string) => Promise<boolean>;
       hasToken: () => Promise<boolean>;
+      setInputCaps: (caps: {
+        summaryMaxLength: number;
+        notesMaxLength: number;
+        skillFileMaxBytes: number;
+      }) => Promise<{
+        summaryMaxLength: number;
+        notesMaxLength: number;
+        skillFileMaxBytes: number;
+      }>;
       analyseSession: (messages: string[]) => Promise<InsightResult>;
 
       // Skills
