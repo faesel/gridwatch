@@ -1210,11 +1210,15 @@ function scanSkillDir(dirPath: string, enabled: boolean): SkillData | null {
   } catch { /* skip unreadable */ }
 
   let tags: string[] = []
+  let childSkills: string[] = []
+  let linkedAgents: string[] = []
   try {
     const metaFile = path.join(dirPath, 'gridwatch.json')
     if (fs.existsSync(metaFile)) {
       const meta = JSON.parse(fs.readFileSync(metaFile, 'utf-8'))
       if (Array.isArray(meta.tags)) tags = meta.tags
+      if (Array.isArray(meta.childSkills)) childSkills = meta.childSkills.filter((s: unknown): s is string => typeof s === 'string')
+      if (Array.isArray(meta.linkedAgents)) linkedAgents = meta.linkedAgents.filter((s: unknown): s is string => typeof s === 'string')
     }
   } catch { /* ignore */ }
 
@@ -1237,6 +1241,8 @@ function scanSkillDir(dirPath: string, enabled: boolean): SkillData | null {
     createdAt: new Date(earliestBirth).toISOString(),
     modifiedAt: latestMtime ? new Date(latestMtime).toISOString() : new Date().toISOString(),
     tags,
+    childSkills,
+    linkedAgents,
     estimatedTokens,
   }
 }
@@ -1395,6 +1401,85 @@ ipcMain.handle('skills:set-tags', async (_e, skillName: string, tags: string[]):
       try { existing = JSON.parse(fs.readFileSync(metaFile, 'utf-8')) } catch { /* ignore */ }
     }
     fs.writeFileSync(metaFile, JSON.stringify({ ...existing, tags }, null, 2), 'utf-8')
+    return true
+  } catch {
+    return false
+  }
+})
+
+ipcMain.handle('skills:set-relations', async (_e, skillName: string, childSkills: unknown, linkedAgents: unknown): Promise<boolean> => {
+  try {
+    if (!isValidSkillName(skillName)) return false
+    if (!Array.isArray(childSkills) || !Array.isArray(linkedAgents)) return false
+
+    const enabledDir = path.join(os.homedir(), '.copilot', 'skills')
+    const disabledDir = path.join(os.homedir(), '.copilot', 'skills-disabled')
+    const skillDir = fs.existsSync(path.join(enabledDir, skillName)) ? path.join(enabledDir, skillName)
+      : fs.existsSync(path.join(disabledDir, skillName)) ? path.join(disabledDir, skillName) : null
+    if (!skillDir) return false
+
+    const skillExists = (name: string): boolean =>
+      fs.existsSync(path.join(enabledDir, name, 'SKILL.md')) || fs.existsSync(path.join(disabledDir, name, 'SKILL.md'))
+
+    const agentsDir = path.join(os.homedir(), '.copilot', 'agents')
+    const agentExists = (name: string): boolean =>
+      fs.existsSync(path.join(agentsDir, `${name}.agent.md`))
+
+    const readChildren = (name: string): string[] => {
+      for (const base of [enabledDir, disabledDir]) {
+        const meta = path.join(base, name, 'gridwatch.json')
+        if (fs.existsSync(meta)) {
+          try {
+            const parsed = JSON.parse(fs.readFileSync(meta, 'utf-8'))
+            if (Array.isArray(parsed.childSkills)) {
+              return parsed.childSkills.filter((s: unknown): s is string => typeof s === 'string')
+            }
+          } catch { /* ignore */ }
+          return []
+        }
+      }
+      return []
+    }
+
+    // Sanitise child skills: drop invalid names, self-references, non-existent
+    // skills, and any link that would introduce a cycle. We sanitise rather
+    // than reject so a single stale/missing entry can't block unrelated edits.
+    const cleanChildren: string[] = []
+    const createsCycle = (start: string): boolean => {
+      const visited = new Set<string>()
+      const stack = [start]
+      while (stack.length) {
+        const n = stack.pop() as string
+        if (n === skillName) return true
+        if (visited.has(n)) continue
+        visited.add(n)
+        const kids = n === skillName ? cleanChildren : readChildren(n)
+        for (const k of kids) stack.push(k)
+      }
+      return false
+    }
+    for (const c of childSkills) {
+      if (typeof c !== 'string' || !isValidSkillName(c)) continue
+      if (c === skillName || cleanChildren.includes(c)) continue
+      if (!skillExists(c)) continue
+      if (createsCycle(c)) continue
+      cleanChildren.push(c)
+    }
+
+    // Sanitise linked agents: drop invalid names and non-existent agents.
+    const cleanAgents: string[] = []
+    for (const a of linkedAgents) {
+      if (typeof a !== 'string' || !isValidAgentName(a)) continue
+      if (cleanAgents.includes(a) || !agentExists(a)) continue
+      cleanAgents.push(a)
+    }
+
+    const metaFile = path.join(skillDir, 'gridwatch.json')
+    let existing: Record<string, unknown> = {}
+    if (fs.existsSync(metaFile)) {
+      try { existing = JSON.parse(fs.readFileSync(metaFile, 'utf-8')) } catch { /* ignore */ }
+    }
+    fs.writeFileSync(metaFile, JSON.stringify({ ...existing, childSkills: cleanChildren, linkedAgents: cleanAgents }, null, 2), 'utf-8')
     return true
   } catch {
     return false

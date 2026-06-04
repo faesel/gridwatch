@@ -2,7 +2,9 @@ import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import type { SkillData } from '../types/skill'
+import type { CustomAgentData } from '../types/agent'
 import TagInput from '../components/TagInput'
+import RelationPicker from '../components/RelationPicker'
 import styles from './SkillsPage.module.css'
 
 // Strip YAML frontmatter before rendering markdown
@@ -34,6 +36,12 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
   const [localTags, setLocalTags] = useState<string[]>([])
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
   const [showTagFilter, setShowTagFilter] = useState(false)
+
+  // Relationship state
+  const [agents, setAgents] = useState<CustomAgentData[]>([])
+  const [localChildSkills, setLocalChildSkills] = useState<string[]>([])
+  const [localLinkedAgents, setLocalLinkedAgents] = useState<string[]>([])
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   const loadSkills = useCallback(async () => {
     try {
@@ -78,6 +86,17 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
   // Sync local tags when selected skill changes
   useEffect(() => {
     setLocalTags(selected?.tags ?? [])
+  }, [selected?.name])
+
+  // Load custom agents once for relationship linking
+  useEffect(() => {
+    window.gridwatchAPI.getCustomAgents().then(setAgents).catch(() => { /* ignore */ })
+  }, [])
+
+  // Sync local relations when selected skill changes
+  useEffect(() => {
+    setLocalChildSkills(selected?.childSkills ?? [])
+    setLocalLinkedAgents(selected?.linkedAgents ?? [])
   }, [selected?.name])
 
   const addTag = async (tag: string) => {
@@ -133,6 +152,159 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
 
   const hasVisibleSkills = filtered.length > 0
   const allVisibleSkillsEnabled = hasVisibleSkills && filtered.every((s) => s.enabled)
+
+  // ── Relationship view model ──────────────────────────────────────────
+  const filterActive = search.trim() !== '' || selectedTags.size > 0
+
+  const nameToSkill = useMemo(() => {
+    const m = new Map<string, SkillData>()
+    for (const s of skills) m.set(s.name, s)
+    return m
+  }, [skills])
+
+  const childrenOf = useCallback((s: SkillData): SkillData[] =>
+    (s.childSkills ?? [])
+      .map((n) => nameToSkill.get(n))
+      .filter((c): c is SkillData => !!c)
+  , [nameToSkill])
+
+  // Names that are a resolved child of at least one skill — hidden from top level
+  const childNameSet = useMemo(() => {
+    const set = new Set<string>()
+    for (const s of skills) {
+      for (const c of (s.childSkills ?? [])) {
+        if (nameToSkill.has(c)) set.add(c)
+      }
+    }
+    return set
+  }, [skills, nameToSkill])
+
+  const topLevelSkills = useMemo(() => {
+    const roots = skills.filter((s) => !childNameSet.has(s.name))
+    // Safety net: surface any skills unreachable from roots (e.g. trapped in a
+    // manually-edited cyclic gridwatch.json) so they never silently disappear.
+    const reachable = new Set<string>()
+    const visit = (s: SkillData) => {
+      if (reachable.has(s.name)) return
+      reachable.add(s.name)
+      for (const c of childrenOf(s)) visit(c)
+    }
+    roots.forEach(visit)
+    const orphans = skills.filter((s) => !reachable.has(s.name))
+    return [...roots, ...orphans]
+  }, [skills, childNameSet, childrenOf])
+
+  const matchSkill = useCallback((s: SkillData): boolean => {
+    if (selectedTags.size > 0) {
+      const st = s.tags ?? []
+      for (const tag of selectedTags) if (!st.includes(tag)) return false
+    }
+    if (!search) return true
+    const q = search.toLowerCase()
+    return s.displayName.toLowerCase().includes(q)
+      || s.description.toLowerCase().includes(q)
+      || s.name.toLowerCase().includes(q)
+      || (s.tags ?? []).some((t) => t.toLowerCase().includes(q))
+  }, [selectedTags, search])
+
+  // A node is visible while filtering if it matches or any descendant matches
+  const isNodeVisible = useCallback((s: SkillData, seen: Set<string>): boolean => {
+    if (matchSkill(s)) return true
+    if (seen.has(s.name)) return false
+    seen.add(s.name)
+    return childrenOf(s).some((c) => isNodeVisible(c, seen))
+  }, [matchSkill, childrenOf])
+
+  const toggleExpand = (name: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
+
+  // Cycle detection: is `targetName` reachable from `rootName` via child links?
+  const isDescendant = useCallback((rootName: string, targetName: string, seen: Set<string>): boolean => {
+    const root = nameToSkill.get(rootName)
+    if (!root) return false
+    for (const cn of (root.childSkills ?? [])) {
+      if (cn === targetName) return true
+      if (!seen.has(cn)) {
+        seen.add(cn)
+        if (isDescendant(cn, targetName, seen)) return true
+      }
+    }
+    return false
+  }, [nameToSkill])
+
+  const wouldCycle = useCallback((parentName: string, childName: string): boolean =>
+    childName === parentName || isDescendant(childName, parentName, new Set())
+  , [isDescendant])
+
+  const childOptions = useMemo(() => {
+    if (!selected) return []
+    return skills
+      .filter((s) => s.name !== selected.name
+        && !localChildSkills.includes(s.name)
+        && !wouldCycle(selected.name, s.name))
+      .map((s) => ({ id: s.name, label: s.displayName }))
+  }, [skills, selected, localChildSkills, wouldCycle])
+
+  const agentOptions = useMemo(() =>
+    agents
+      .filter((a) => !localLinkedAgents.includes(a.name))
+      .map((a) => ({ id: a.name, label: a.displayName || a.name }))
+  , [agents, localLinkedAgents])
+
+  const persistRelations = useCallback(async (children: string[], linked: string[]) => {
+    if (!selected) return
+    const name = selected.name
+    const ok = await window.gridwatchAPI.setSkillRelations(name, children, linked)
+    if (!ok) setActionError('Failed to save relationships')
+    // Reconcile with what was actually persisted (the main process sanitises
+    // out invalid/missing/cyclic entries), so the UI always reflects disk.
+    try {
+      const fresh = await window.gridwatchAPI.getSkills()
+      setSkills(fresh)
+      const updated = fresh.find((s) => s.name === name)
+      if (updated) {
+        setLocalChildSkills(updated.childSkills ?? [])
+        setLocalLinkedAgents(updated.linkedAgents ?? [])
+      }
+    } catch { /* ignore */ }
+  }, [selected])
+
+  const addChild = (name: string) => {
+    if (!selected || localChildSkills.includes(name) || name === selected.name) return
+    if (wouldCycle(selected.name, name)) {
+      setActionError('Cannot add child: would create a circular dependency')
+      return
+    }
+    const next = [...localChildSkills, name]
+    setLocalChildSkills(next)
+    void persistRelations(next, localLinkedAgents)
+  }
+
+  const removeChild = (name: string) => {
+    const next = localChildSkills.filter((n) => n !== name)
+    setLocalChildSkills(next)
+    void persistRelations(next, localLinkedAgents)
+  }
+
+  const addLinkedAgent = (name: string) => {
+    if (!selected || localLinkedAgents.includes(name)) return
+    const next = [...localLinkedAgents, name]
+    setLocalLinkedAgents(next)
+    void persistRelations(localChildSkills, next)
+  }
+
+  const removeLinkedAgent = (name: string) => {
+    const next = localLinkedAgents.filter((n) => n !== name)
+    setLocalLinkedAgents(next)
+    void persistRelations(localChildSkills, next)
+  }
 
   const handleSelectSkill = (skill: SkillData) => {
     if (unsaved && !confirm('You have unsaved changes. Discard?')) return
@@ -314,6 +486,69 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
     return <div className={styles.markdownView} dangerouslySetInnerHTML={{ __html: html }} />
   }
 
+  const renderSkillCard = (skill: SkillData, depth: number, hasKids: boolean, open: boolean) => (
+    <div
+      className={`${styles.card} ${depth > 0 ? styles.childCard : ''} ${selected?.name === skill.name ? styles.cardActive : ''} ${!skill.enabled ? styles.cardDisabled : ''}`}
+      onClick={() => handleSelectSkill(skill)}
+    >
+      <div className={styles.cardName}>
+        {hasKids && (
+          <button
+            className={styles.parentToggle}
+            onClick={(e) => toggleExpand(skill.name, e)}
+            aria-label={open ? 'Collapse child skills' : 'Expand child skills'}
+            aria-expanded={open}
+          >
+            {open ? '▼' : '▶'}
+          </button>
+        )}
+        {skill.displayName}
+        {!skill.enabled && <span className={styles.disabledBadge}>DISABLED</span>}
+      </div>
+      {skill.description && (
+        <div className={styles.cardDesc}>{skill.description}</div>
+      )}
+      <div className={styles.cardMeta}>
+        <span>{skill.files.length} file{skill.files.length !== 1 ? 's' : ''}</span>
+        <span className={styles.tokenEstimate}>~{skill.estimatedTokens.toLocaleString()} tokens</span>
+        {skill.usageCount != null && skill.usageCount > 0 && (
+          <span className={styles.usageStat}>{skill.usageCount} use{skill.usageCount !== 1 ? 's' : ''}</span>
+        )}
+      </div>
+      {(skill.tags ?? []).length > 0 && (
+        <div className={styles.cardTags}>
+          {skill.tags.map((t) => (
+            <span key={t} className={styles.tagChip}>{t}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  const renderSkillNode = (skill: SkillData, depth: number, seen: Set<string>): React.ReactNode => {
+    if (seen.has(skill.name)) return null // cycle guard
+    const nextSeen = new Set(seen).add(skill.name)
+    const kids = childrenOf(skill).filter((c) => !nextSeen.has(c.name))
+    const visibleKids = filterActive ? kids.filter((c) => isNodeVisible(c, new Set())) : kids
+    const hasKids = kids.length > 0
+    // While filtering, force-expand parents that have a matching descendant
+    const open = filterActive ? visibleKids.length > 0 : expanded.has(skill.name)
+    return (
+      <div key={skill.name}>
+        {renderSkillCard(skill, depth, hasKids, open)}
+        {hasKids && open && visibleKids.length > 0 && (
+          <div className={styles.childGroup}>
+            {visibleKids.map((c) => renderSkillNode(c, depth + 1, nextSeen))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const visibleTopLevel = filterActive
+    ? topLevelSkills.filter((s) => isNodeVisible(s, new Set()))
+    : topLevelSkills
+
   return (
     <div className={styles.page}>
       {/* ── List column ── */}
@@ -379,35 +614,7 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
               {skills.length === 0 ? 'NO SKILLS FOUND' : 'NO MATCHING SKILLS'}
             </div>
           )}
-          {filtered.map((skill) => (
-            <div
-              key={skill.name}
-              className={`${styles.card} ${selected?.name === skill.name ? styles.cardActive : ''} ${!skill.enabled ? styles.cardDisabled : ''}`}
-              onClick={() => handleSelectSkill(skill)}
-            >
-              <div className={styles.cardName}>
-                {skill.displayName}
-                {!skill.enabled && <span className={styles.disabledBadge}>DISABLED</span>}
-              </div>
-              {skill.description && (
-                <div className={styles.cardDesc}>{skill.description}</div>
-              )}
-              <div className={styles.cardMeta}>
-                <span>{skill.files.length} file{skill.files.length !== 1 ? 's' : ''}</span>
-                <span className={styles.tokenEstimate}>~{skill.estimatedTokens.toLocaleString()} tokens</span>
-                {skill.usageCount != null && skill.usageCount > 0 && (
-                  <span className={styles.usageStat}>{skill.usageCount} use{skill.usageCount !== 1 ? 's' : ''}</span>
-                )}
-              </div>
-              {(skill.tags ?? []).length > 0 && (
-                <div className={styles.cardTags}>
-                  {skill.tags.map((t) => (
-                    <span key={t} className={styles.tagChip}>{t}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+          {!loading && visibleTopLevel.map((skill) => renderSkillNode(skill, 0, new Set()))}
         </div>
       </div>
 
@@ -459,6 +666,65 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
                 allTags={allTags}
                 onAdd={(tag) => { addTag(tag) }}
               />
+            </div>
+          </div>
+
+          <div className={styles.relationsSection}>
+            <div className={styles.relationGroup}>
+              <span className={styles.tagsSectionLabel}>CHILD SKILLS</span>
+              <div className={styles.tagsRow}>
+                {localChildSkills.map((name) => {
+                  const child = nameToSkill.get(name)
+                  return (
+                    <span
+                      key={name}
+                      className={`${styles.relationChip} ${child ? '' : styles.relationChipMissing} ${child ? styles.relationChipClickable : ''}`}
+                      onClick={child ? () => handleSelectSkill(child) : undefined}
+                      title={child ? `Open ${child.displayName}` : 'Skill no longer exists'}
+                    >
+                      {child ? child.displayName : `${name} (missing)`}
+                      <button
+                        className={styles.tagRemove}
+                        onClick={(e) => { e.stopPropagation(); removeChild(name) }}
+                        aria-label={`Remove child skill ${name}`}
+                      >×</button>
+                    </span>
+                  )
+                })}
+                <RelationPicker
+                  options={childOptions}
+                  onAdd={addChild}
+                  placeholder="+ link skill"
+                />
+              </div>
+            </div>
+
+            <div className={styles.relationGroup}>
+              <span className={styles.tagsSectionLabel}>LINKED AGENTS</span>
+              <div className={styles.tagsRow}>
+                {localLinkedAgents.map((name) => {
+                  const agent = agents.find((a) => a.name === name)
+                  return (
+                    <span
+                      key={name}
+                      className={`${styles.relationChip} ${agent ? '' : styles.relationChipMissing}`}
+                      title={agent ? agent.description : 'Agent no longer exists'}
+                    >
+                      {agent ? (agent.displayName || agent.name) : `${name} (missing)`}
+                      <button
+                        className={styles.tagRemove}
+                        onClick={() => removeLinkedAgent(name)}
+                        aria-label={`Remove linked agent ${name}`}
+                      >×</button>
+                    </span>
+                  )
+                })}
+                <RelationPicker
+                  options={agentOptions}
+                  onAdd={addLinkedAgent}
+                  placeholder="+ link agent"
+                />
+              </div>
             </div>
           </div>
 

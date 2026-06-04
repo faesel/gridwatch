@@ -17,5 +17,7 @@ export interface SkillData {
   usageCount?: number;
   lastUsed?: string;
   tags: string[];
+  childSkills: string[];
+  linkedAgents: string[];
   estimatedTokens: number;
 }

@@ -815,3 +815,90 @@
   0%, 100% { opacity: 0.4; }
   50% { opacity: 1; }
 }
+
+/* ── Skill hierarchy (parent/child nesting) ──────────────────── */
+.parentToggle {
+  background: none;
+  border: none;
+  color: var(--tron-cyan);
+  text-shadow: var(--tron-glow-cyan);
+  cursor: pointer;
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  line-height: 1;
+  padding: 0 2px 0 0;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.parentToggle:hover {
+  color: var(--tron-orange);
+  text-shadow: var(--tron-glow-orange);
+}
+
+.childGroup {
+  margin-left: 18px;
+  border-left: 1px solid color-mix(in srgb, var(--tron-blue) 45%, transparent);
+  padding-left: 2px;
+}
+
+.childCard {
+  position: relative;
+}
+
+.childCard .cardName {
+  color: var(--tron-blue);
+}
+
+.childCard::before {
+  content: '└';
+  position: absolute;
+  left: -12px;
+  top: 8px;
+  color: color-mix(in srgb, var(--tron-blue) 60%, transparent);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+}
+
+/* ── Relationships detail section ────────────────────────────── */
+.relationsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--tron-border);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.relationGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.relationChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: color-mix(in srgb, var(--tron-blue) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tron-blue) 35%, transparent);
+  color: var(--tron-blue);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 3px 8px;
+  border-radius: 2px;
+}
+
+.relationChipClickable {
+  cursor: pointer;
+}
+
+.relationChipClickable:hover {
+  border-color: var(--tron-cyan);
+  color: var(--tron-cyan);
+}
+
+.relationChipMissing {
+  background: color-mix(in srgb, var(--tron-orange) 10%, transparent);
+  border-color: color-mix(in srgb, var(--tron-orange) 45%, transparent);
+  color: var(--tron-orange);
+}

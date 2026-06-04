@@ -44,7 +44,7 @@ Renderer (src/)
 | File | Contents |
 |---|---|
 | `~/.copilot/session-state/<uuid>/gridwatch.json` | `{ "tags": ["tag1", "tag2"] }` |
-| `~/.copilot/skills/<name>/gridwatch.json` | `{ "tags": ["tag1", "tag2"] }` — skill tags, same format as session tags |
+| `~/.copilot/skills/<name>/gridwatch.json` | `{ "tags": [...], "childSkills": [...], "linkedAgents": [...] }` — skill tags, nested child-skill folder names, and linked agent ids |
 | `~/.copilot/skills-disabled/<name>/` | Skills moved here when disabled via GridWatch toggle |
 | `~/.copilot/gridwatch-mcp-tools-cache.json` | Disk-persisted cache of MCP tool lists queried via JSON-RPC `tools/list` |
 | `~/.copilot/gridwatch-lsp-disabled.json` | LSP servers moved here when disabled via GridWatch toggle |
@@ -123,6 +123,7 @@ gridwatch/
 | `exportSkill(name)` | `skills:export` | Creates a zip archive via save dialog |
 | `importSkill()` | `skills:import` | Opens file/folder dialog, copies into `skills/` |
 | `setSkillTags(name, tags[])` | `skills:set-tags` | Writes/merges tags into skill's `gridwatch.json` |
+| `setSkillRelations(name, childSkills[], linkedAgents[])` | `skills:set-relations` | Writes/merges child-skill and linked-agent relationships into skill's `gridwatch.json`. Validates that children/agents exist and rejects self-reference |
 
 **Skill name validation:** lowercase alphanumeric and hyphens only (`/^[a-z0-9][a-z0-9-]*$/`).
 
@@ -175,6 +176,8 @@ interface SkillData {
   usageCount?: number       // from session event cross-reference
   lastUsed?: string         // ISO date of last usage
   tags: string[]            // from gridwatch.json in the skill directory
+  childSkills: string[]     // from gridwatch.json — canonical folder names of nested child skills
+  linkedAgents: string[]    // from gridwatch.json — agent ids that run for this skill
 }
 
 interface SkillFile {
