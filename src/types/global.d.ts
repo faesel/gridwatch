@@ -4,6 +4,7 @@ import type { McpServerData } from './mcp';
 import type { CustomAgentData } from './agent';
 import type { LspServerData } from './lsp';
 import type { AllowedDirectory } from './dirs';
+import type { AutoTagRule } from './autotag';
 
 export interface PromptFeedback {
   prompt: string;
@@ -81,6 +82,11 @@ declare global {
       getAllowedDirs: () => Promise<AllowedDirectory[]>;
       addAllowedDir: () => Promise<{ ok: boolean; directory?: AllowedDirectory; error?: string }>;
       removeAllowedDir: (dirPath: string) => Promise<{ ok: boolean; error?: string }>;
+      getAutoTagRules: () => Promise<AutoTagRule[]>;
+      getKnownTags: () => Promise<string[]>;
+      pickAutoTagDirectory: () => Promise<{ ok: boolean; path?: string; error?: string }>;
+      addAutoTagRule: (dirPath: string, tags: string[]) => Promise<{ ok: boolean; rule?: AutoTagRule; error?: string }>;
+      removeAutoTagRule: (id: string) => Promise<{ ok: boolean; error?: string }>;
 
       // Window controls
       getPlatform: () => Promise<string>;

@@ -847,6 +847,39 @@
   border-radius: 2px;
 }
 
+.autoTagChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: color-mix(in srgb, var(--tron-cyan) 10%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--tron-cyan) 40%, transparent);
+  color: var(--tron-cyan);
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.autoTagChipDetail {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: color-mix(in srgb, var(--tron-cyan) 10%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--tron-cyan) 45%, transparent);
+  color: var(--tron-cyan);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 3px 8px;
+  border-radius: 2px;
+}
+
+.autoTagHint {
+  margin-top: 6px;
+  color: var(--tron-text-dim);
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  letter-spacing: 0.5px;
+}
+
 .tagRemove {
   background: none;
   border: none;

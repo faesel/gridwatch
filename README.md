@@ -47,6 +47,7 @@ GridWatch reads the local session data written by [GitHub Copilot CLI](https://g
 - 🟩 **Activity heatmap** — GitHub-style contribution grid showing your session activity over 52 weeks
 - ⚡ **AI Insights** — analyse your sessions with OpenAI to get prompt quality scores and improvement suggestions
 - 🏷️ **Tagging** — add, remove, and filter sessions by custom tags
+- ⛓ **Directory-based auto-tag rules** — define rules in Settings that map a directory to one or more tags; any session whose working directory sits under that directory is automatically tagged. Auto-tags are derived at load time (never written to disk), shown read-only with a distinct ⛓ chip, and are searchable and filterable like manual tags
 - ✦ **Skills management** — browse, create, edit, duplicate, delete, and search your Copilot CLI skills (`~/.copilot/skills/`). View rendered markdown with Tron-themed styling, toggle skills on/off, rename folders, import from files or folders, and export as zip archives. Tag skills with custom labels and filter by tags
 - 🔗 **Skill relationships** — link child skills to a parent skill and link the agents a skill invokes. Child skills are nested under their parent in the list with an expand/collapse accordion and indented, colour-coded markers; nesting is preserved even while filtering. The detail panel shows each skill's child skills, linked agents, and parent skills. Relationship chips are clickable — jump between parent and child skills, or flip to the Agents panel and open a linked agent's detail view
 - ◈ **MCP server dashboard** — view all installed Model Context Protocol servers (local stdio and remote HTTP), enable/disable servers to manage context window bloat, browse their full tool catalogues grouped by category with descriptions and parameter schemas (queried live via JSON-RPC `tools/list`), see environment variables (with secret masking), connection times, and command details
@@ -241,6 +242,7 @@ GridWatch reads exclusively from local files — no network requests are made ex
 | Disabled MCP servers       | `~/.copilot/gridwatch-mcp-disabled.json`                                                                                                                 |
 | MCP tool cache             | `~/.copilot/gridwatch-mcp-tools-cache.json` (cached from JSON-RPC `tools/list` queries)                                                                 |
 | Disabled LSP servers       | `~/.copilot/gridwatch-lsp-disabled.json`                                                                                                                 |
+| Auto-tag rules             | `~/.copilot/gridwatch-autotag-rules.json` (directory→tags rules; applied non-destructively at load)                                                      |
 | Encrypted API token        | `~/.copilot/gridwatch-token.enc` (encrypted via OS keychain)                                                                                             |
 
 **Network requests:**

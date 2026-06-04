@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, memo } from 'react'
 import type { AllowedDirectory } from '../types/dirs'
+import type { AutoTagRule } from '../types/autotag'
+import TagInput from '../components/TagInput'
 import styles from './SettingsPage.module.css'
 
 export interface AppSettings {
@@ -85,6 +87,14 @@ function SettingsPage({ settings, onChange }: Props) {
   const [removingDir, setRemovingDir] = useState<string | null>(null)
   const [dirError, setDirError] = useState<string | null>(null)
 
+  const [rules, setRules] = useState<AutoTagRule[]>([])
+  const [knownTags, setKnownTags] = useState<string[]>([])
+  const [pendingPath, setPendingPath] = useState<string | null>(null)
+  const [pendingTags, setPendingTags] = useState<string[]>([])
+  const [savingRule, setSavingRule] = useState(false)
+  const [removingRule, setRemovingRule] = useState<string | null>(null)
+  const [ruleError, setRuleError] = useState<string | null>(null)
+
   useEffect(() => { window.gridwatchAPI.hasToken().then(setHasToken) }, [])
 
   const loadDirs = useCallback(async () => {
@@ -123,6 +133,81 @@ function SettingsPage({ settings, onChange }: Props) {
     } catch { /* ignore */ }
     setRemovingDir(null)
   }, [loadDirs])
+
+  const loadRules = useCallback(async () => {
+    try {
+      const [r, t] = await Promise.all([
+        window.gridwatchAPI.getAutoTagRules(),
+        window.gridwatchAPI.getKnownTags(),
+      ])
+      setRules(r)
+      setKnownTags(t)
+    } catch { /* ignore */ }
+  }, [])
+
+  useEffect(() => { loadRules() }, [loadRules])
+
+  const handlePickDir = useCallback(async () => {
+    setRuleError(null)
+    try {
+      const result = await window.gridwatchAPI.pickAutoTagDirectory()
+      if (result.ok && result.path) {
+        setPendingPath(result.path)
+        setPendingTags([])
+      } else if (result.error && result.error !== 'Cancelled') {
+        setRuleError(result.error)
+      }
+    } catch { /* ignore */ }
+  }, [])
+
+  const addPendingTag = useCallback((tag: string) => {
+    setPendingTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]))
+  }, [])
+
+  const removePendingTag = useCallback((tag: string) => {
+    setPendingTags((prev) => prev.filter((t) => t !== tag))
+  }, [])
+
+  const cancelRule = useCallback(() => {
+    setPendingPath(null)
+    setPendingTags([])
+    setRuleError(null)
+  }, [])
+
+  const handleSaveRule = useCallback(async () => {
+    if (!pendingPath) return
+    if (pendingTags.length === 0) {
+      setRuleError('Enter at least one tag')
+      return
+    }
+    setSavingRule(true)
+    setRuleError(null)
+    try {
+      const result = await window.gridwatchAPI.addAutoTagRule(pendingPath, pendingTags)
+      if (result.ok) {
+        setPendingPath(null)
+        setPendingTags([])
+        await loadRules()
+      } else if (result.error) {
+        setRuleError(result.error)
+      }
+    } catch { /* ignore */ }
+    setSavingRule(false)
+  }, [pendingPath, pendingTags, loadRules])
+
+  const handleRemoveRule = useCallback(async (id: string) => {
+    setRemovingRule(id)
+    setRuleError(null)
+    try {
+      const result = await window.gridwatchAPI.removeAutoTagRule(id)
+      if (result.ok) {
+        await loadRules()
+      } else if (result.error) {
+        setRuleError(result.error)
+      }
+    } catch { /* ignore */ }
+    setRemovingRule(null)
+  }, [loadRules])
 
   const update = (patch: Partial<AppSettings>) => {
     const next = { ...settings, ...patch }
@@ -317,6 +402,98 @@ function SettingsPage({ settings, onChange }: Props) {
         >
           {addingDir ? 'ADDING…' : '+ ADD DIRECTORY'}
         </button>
+      </div>
+
+      {/* Auto-Tag Rules */}
+      <div className={styles.panel}>
+        <div className={styles.sectionTitle}>AUTO-TAG RULES</div>
+        <div className={styles.description}>
+          Automatically apply tags to any session whose working directory falls under a chosen folder
+          (including its subdirectories). Auto-tags appear on sessions in <span style={{ color: 'var(--tron-orange)' }}>orange</span> and
+          can only be changed here. Matching is case-insensitive on macOS and Windows.
+        </div>
+
+        {ruleError && (
+          <div className={styles.dirError}>
+            {ruleError}
+            <button
+              className={styles.dirErrorDismiss}
+              onClick={() => setRuleError(null)}
+              aria-label="Dismiss error"
+            >×</button>
+          </div>
+        )}
+
+        <div className={styles.dirList}>
+          {rules.length === 0 && !pendingPath && (
+            <div className={styles.dirEmpty}>No auto-tag rules configured</div>
+          )}
+          {rules.map((rule) => (
+            <div key={rule.id} className={styles.dirRow}>
+              <span className={styles.dirPath} title={rule.path}>{rule.path}</span>
+              <span className={styles.ruleTags}>
+                {rule.tags.map((t) => (
+                  <span key={t} className={styles.ruleTagChip}>{t}</span>
+                ))}
+              </span>
+              <button
+                className={styles.dirRemoveBtn}
+                onClick={() => handleRemoveRule(rule.id)}
+                disabled={removingRule === rule.id}
+                title="Remove this rule"
+                aria-label={`Remove auto-tag rule for ${rule.path}`}
+              >
+                {removingRule === rule.id ? '…' : '✕'}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {pendingPath ? (
+          <div className={styles.ruleEditor}>
+            <div className={styles.dirPath} title={pendingPath}>{pendingPath}</div>
+            <div className={styles.ruleTagsRow}>
+              {pendingTags.map((t) => (
+                <span key={t} className={styles.tagChipDetail}>
+                  {t}
+                  <button
+                    className={styles.tagRemove}
+                    onClick={() => removePendingTag(t)}
+                    aria-label={`Remove tag ${t}`}
+                  >×</button>
+                </span>
+              ))}
+              <TagInput
+                currentTags={pendingTags}
+                allTags={knownTags}
+                onAdd={addPendingTag}
+              />
+            </div>
+            <div className={styles.ruleActions}>
+              <button
+                className={styles.dirAddBtn}
+                onClick={handleSaveRule}
+                disabled={savingRule || pendingTags.length === 0}
+              >
+                {savingRule ? 'SAVING…' : 'SAVE RULE'}
+              </button>
+              <button
+                className={styles.ruleCancelBtn}
+                onClick={cancelRule}
+                disabled={savingRule}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            className={styles.dirAddBtn}
+            onClick={handlePickDir}
+          >
+            + ADD RULE
+          </button>
+        )}
       </div>
 
       {/* Reset */}

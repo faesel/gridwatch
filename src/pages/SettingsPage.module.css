@@ -338,3 +338,94 @@
   padding: 0 4px;
   margin-left: auto;
 }
+
+.ruleTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.ruleTagChip {
+  background: color-mix(in srgb, var(--tron-orange) 10%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--tron-orange) 40%, transparent);
+  color: var(--tron-orange);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.ruleEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--tron-border);
+  margin-bottom: 12px;
+}
+
+.ruleTagsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.ruleActions {
+  display: flex;
+  gap: 8px;
+}
+
+.ruleCancelBtn {
+  background: none;
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text-dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  font-weight: 600;
+  letter-spacing: 1px;
+  padding: 8px 16px;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.ruleCancelBtn:hover {
+  border-color: var(--tron-orange);
+  color: var(--tron-orange);
+}
+
+.ruleCancelBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tagChipDetail {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: color-mix(in srgb, var(--tron-cyan) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tron-cyan) 35%, transparent);
+  color: var(--tron-cyan);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 3px 8px;
+  border-radius: 2px;
+}
+
+.tagRemove {
+  background: none;
+  border: none;
+  color: color-mix(in srgb, var(--tron-cyan) 50%, transparent);
+  cursor: pointer;
+  font-size: calc(13 * var(--font-scale, 1) * 1px);
+  line-height: 1;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.tagRemove:hover {
+  color: var(--tron-orange);
+}

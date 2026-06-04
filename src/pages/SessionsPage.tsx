@@ -173,6 +173,8 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
   const addTag = async (tag: string) => {
     const trimmed = tag.trim().toLowerCase().replace(/\s+/g, '-')
     if (!trimmed || !selectedSession || localTags.includes(trimmed)) return
+    // Don't let a tag already applied by an auto-tag rule be added manually
+    if ((selectedSession.autoTags ?? []).includes(trimmed)) return
     const next = [...localTags, trimmed]
     setLocalTags(next)
     await window.gridwatchAPI.setTags(selectedSession.id, next)
@@ -246,9 +248,9 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
     }
   }
 
-  // Collect all unique tags across sessions
+  // Collect all unique tags across sessions (manual + auto-applied)
   const allTags = useMemo(() => Array.from(
-    new Set(sessions.flatMap((s) => s.tags ?? []))
+    new Set(sessions.flatMap((s) => [...(s.tags ?? []), ...(s.autoTags ?? [])]))
   ).sort(), [sessions])
 
   const toggleTag = (tag: string) => {
@@ -267,9 +269,9 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
     if (typeFilter === 'research' && !s.isResearch) return false
     if (typeFilter === 'review' && !s.isReview) return false
     if (typeFilter === 'coding' && (s.isResearch || s.isReview)) return false
-    // Tag filter: session must have ALL selected tags
+    // Tag filter: session must have ALL selected tags (manual or auto)
     if (selectedTags.size > 0) {
-      const sessionTags = s.tags ?? []
+      const sessionTags = [...(s.tags ?? []), ...(s.autoTags ?? [])]
       for (const tag of selectedTags) {
         if (!sessionTags.includes(tag)) return false
       }
@@ -281,7 +283,7 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
       (s.repository || '').toLowerCase().includes(q) ||
       (s.cwd || '').toLowerCase().includes(q) ||
       (s.branch || '').toLowerCase().includes(q) ||
-      (s.tags ?? []).some((t) => t.toLowerCase().includes(q))
+      [...(s.tags ?? []), ...(s.autoTags ?? [])].some((t) => t.toLowerCase().includes(q))
     )
   }), [sessions, selectedTags, debouncedSearch, typeFilter])
 
@@ -425,10 +427,13 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
                     <span className={styles.reviewBadge}>REVIEW</span>
                   )}
                 </div>
-                {(session.tags ?? []).length > 0 && (
+                {((session.tags ?? []).length > 0 || (session.autoTags ?? []).length > 0) && (
                   <div className={styles.cardTags}>
                     {session.tags.map((t) => (
                       <span key={t} className={styles.tagChip}>{t}</span>
+                    ))}
+                    {(session.autoTags ?? []).map((t) => (
+                      <span key={`auto-${t}`} className={styles.autoTagChip} title="Auto-applied by a directory rule">⛓ {t}</span>
                     ))}
                   </div>
                 )}
@@ -598,12 +603,24 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
                   >×</button>
                 </span>
               ))}
+              {(selectedSession?.autoTags ?? []).map((t) => (
+                <span
+                  key={`auto-${t}`}
+                  className={styles.autoTagChipDetail}
+                  title="Auto-applied by a directory rule — manage in Settings → Auto-Tag Rules"
+                >⛓ {t}</span>
+              ))}
               <TagInput
-                currentTags={localTags}
+                currentTags={[...localTags, ...(selectedSession?.autoTags ?? [])]}
                 allTags={allTags}
                 onAdd={(tag) => { addTag(tag) }}
               />
             </div>
+            {(selectedSession?.autoTags ?? []).length > 0 && (
+              <div className={styles.autoTagHint}>
+                ⛓ Auto-tags are applied by directory rules and managed in Settings.
+              </div>
+            )}
           </div>
 
           {/* Notes */}

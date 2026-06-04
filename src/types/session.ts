@@ -56,6 +56,7 @@ export interface SessionSummary {
   copilotVersion?: string;
   lastUserMessage?: string;
   tags: string[];
+  autoTags: string[];
   notes: string;
   peakTokens: number;
   peakUtilisation: number;

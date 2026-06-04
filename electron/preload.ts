@@ -81,6 +81,13 @@ contextBridge.exposeInMainWorld('gridwatchAPI', {
   addAllowedDir: () => ipcRenderer.invoke('dirs:add'),
   removeAllowedDir: (dirPath: string) => ipcRenderer.invoke('dirs:remove', dirPath),
 
+  // Auto-tag rules
+  getAutoTagRules: () => ipcRenderer.invoke('autotag:get-rules'),
+  getKnownTags: () => ipcRenderer.invoke('autotag:get-known-tags'),
+  pickAutoTagDirectory: () => ipcRenderer.invoke('autotag:pick-directory'),
+  addAutoTagRule: (dirPath: string, tags: string[]) => ipcRenderer.invoke('autotag:add-rule', dirPath, tags),
+  removeAutoTagRule: (id: string) => ipcRenderer.invoke('autotag:remove-rule', id),
+
   // Window controls
   getPlatform: () => ipcRenderer.invoke('app:get-platform'),
   windowMinimize: () => ipcRenderer.invoke('window:minimize'),

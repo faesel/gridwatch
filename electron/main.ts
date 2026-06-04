@@ -5,12 +5,14 @@ import path from 'node:path'
 import os from 'node:os'
 import fs from 'node:fs'
 import https from 'node:https'
+import { randomUUID, createHash } from 'node:crypto'
 import type { SessionData, SessionSummary, SessionDetail, TokenDataPoint, RewindSnapshot, CompactionEvent, ContextCostItem } from '../src/types/session'
 import type { SkillData, SkillFile } from '../src/types/skill'
 import type { CustomAgentData } from '../src/types/agent'
 import type { McpServerData, McpEnvVar, McpTool } from '../src/types/mcp'
 import type { LspServerData } from '../src/types/lsp'
 import type { AllowedDirectory } from '../src/types/dirs'
+import type { AutoTagRule } from '../src/types/autotag'
 
 // Must be set before app is ready so the OS picks it up for dock/taskbar tooltip
 app.setName('GridWatch')
@@ -507,6 +509,7 @@ async function loadAllSessions(): Promise<SessionData[]> {
           isResearch,
           isReview,
           agentTypes: Array.from(agentTypesUsed),
+          autoTags: [],
           userMessageCount: userMessages.length,
           researchReportCount: researchReports.length,
           researchReports,
@@ -521,6 +524,25 @@ async function loadAllSessions(): Promise<SessionData[]> {
 
     const results = await Promise.all(sessionPromises)
     const sessions = results.filter((s): s is SessionData => s !== null)
+
+    // Apply directory-based auto-tag rules (derived, non-destructive).
+    // Rules are read once per load and matched against each session's gitRoot ?? cwd.
+    const autoTagRules = readAutoTagRules()
+    if (autoTagRules.length > 0) {
+      for (const s of sessions) {
+        const dir = s.gitRoot || s.cwd
+        if (!dir) continue
+        const matched = new Set<string>()
+        for (const rule of autoTagRules) {
+          if (dirMatchesRule(dir, rule.path)) {
+            for (const t of rule.tags) matched.add(t)
+          }
+        }
+        // Exclude any tag already present manually so a tag never appears twice
+        s.autoTags = Array.from(matched).filter((t) => !s.tags.includes(t))
+      }
+    }
+
     sessions.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     sessionsCache = { data: sessions, timestamp: Date.now() }
     return sessions
@@ -551,6 +573,7 @@ function toSummary(s: SessionData): SessionSummary {
     copilotVersion: s.copilotVersion,
     lastUserMessage: s.lastUserMessage,
     tags: s.tags,
+    autoTags: s.autoTags,
     notes: s.notes,
     peakTokens: s.peakTokens,
     peakUtilisation: s.peakUtilisation,
@@ -2226,3 +2249,161 @@ ipcMain.handle('dirs:remove', async (_e, dirPath: string): Promise<{ ok: boolean
     return { ok: false, error: (err as Error).message }
   }
 })
+
+// ── Auto-tag rules ────────────────────────────────────────────────────────────
+// Directory → tags rules. Sessions whose gitRoot/cwd falls under a rule's
+// directory are auto-tagged at load time (derived, never written to session files).
+
+const autoTagRulesPath = path.join(os.homedir(), '.copilot', 'gridwatch-autotag-rules.json')
+
+const MAX_TAG_LENGTH = 50
+
+/** Normalise + validate a list of tag strings (lowercase, hyphenated, deduped). */
+function sanitiseTags(input: unknown): string[] {
+  if (!Array.isArray(input)) return []
+  const out: string[] = []
+  for (const raw of input) {
+    if (typeof raw !== 'string') continue
+    const t = raw.trim().toLowerCase().replace(/\s+/g, '-')
+    if (!t || t.length > MAX_TAG_LENGTH) continue
+    if (PROTOTYPE_POLLUTION_KEYS.has(t)) continue
+    if (!out.includes(t)) out.push(t)
+  }
+  return out
+}
+
+/** Canonical form of a path for comparison — resolved, and case-folded on case-insensitive platforms. */
+function canonicalPath(p: string): string {
+  let r = path.resolve(p)
+  if (process.platform === 'darwin' || process.platform === 'win32') {
+    r = r.toLowerCase()
+  }
+  return r
+}
+
+/** Path-boundary-safe, platform-aware match: dir equals rulePath or is a descendant. */
+function dirMatchesRule(sessionDir: string, rulePath: string): boolean {
+  try {
+    const a = canonicalPath(sessionDir)
+    const b = canonicalPath(rulePath)
+    if (a === b) return true
+    const rel = path.relative(b, a)
+    // Descendant when the relative path is non-empty, not upward (`..`), and not absolute.
+    return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel)
+  } catch {
+    return false
+  }
+}
+
+function readAutoTagRules(): AutoTagRule[] {
+  try {
+    if (!fs.existsSync(autoTagRulesPath)) return []
+    const parsed = JSON.parse(fs.readFileSync(autoTagRulesPath, 'utf-8'))
+    const rules = parsed && typeof parsed === 'object'
+      ? (parsed as Record<string, unknown>).rules
+      : null
+    if (!Array.isArray(rules)) return []
+    const out: AutoTagRule[] = []
+    for (const r of rules) {
+      if (!r || typeof r !== 'object') continue
+      const rule = r as Record<string, unknown>
+      const p = rule.path
+      if (!isValidDirPath(p) || PROTOTYPE_POLLUTION_KEYS.has(p)) continue
+      const tags = sanitiseTags(rule.tags)
+      if (tags.length === 0) continue
+      // Fall back to a deterministic id (derived from the path) so hand-edited,
+      // id-less rules remain stable across reads and can still be removed.
+      const id = typeof rule.id === 'string' && rule.id
+        ? rule.id
+        : 'path-' + createHash('sha1').update(canonicalPath(p)).digest('hex').slice(0, 12)
+      out.push({ id, path: p, tags })
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
+function writeAutoTagRules(rules: AutoTagRule[]): void {
+  fs.writeFileSync(autoTagRulesPath, JSON.stringify({ rules }, null, 2), 'utf-8')
+}
+
+ipcMain.handle('autotag:get-rules', async (): Promise<AutoTagRule[]> => {
+  try {
+    return readAutoTagRules()
+  } catch {
+    return []
+  }
+})
+
+/** All tags currently in use (manual + auto) — powers the rule tag typeahead. */
+ipcMain.handle('autotag:get-known-tags', async (): Promise<string[]> => {
+  try {
+    const sessions = await loadAllSessions()
+    const set = new Set<string>()
+    for (const s of sessions) {
+      for (const t of s.tags ?? []) set.add(t)
+      for (const t of s.autoTags ?? []) set.add(t)
+    }
+    return Array.from(set).sort()
+  } catch {
+    return []
+  }
+})
+
+ipcMain.handle('autotag:pick-directory', async (): Promise<{ ok: boolean; path?: string; error?: string }> => {
+  if (!win) return { ok: false, error: 'No window available' }
+  try {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: 'Choose Directory for Auto-Tag Rule',
+      properties: ['openDirectory'],
+    })
+    if (canceled || !filePaths.length) return { ok: false, error: 'Cancelled' }
+    const selected = filePaths[0]
+    if (!isValidDirPath(selected) || PROTOTYPE_POLLUTION_KEYS.has(selected)) {
+      return { ok: false, error: 'Invalid directory path' }
+    }
+    return { ok: true, path: selected }
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('autotag:add-rule', async (_e, dirPath: string, tags: string[]): Promise<{ ok: boolean; rule?: AutoTagRule; error?: string }> => {
+  try {
+    if (!isValidDirPath(dirPath) || PROTOTYPE_POLLUTION_KEYS.has(dirPath)) {
+      return { ok: false, error: 'Invalid directory path' }
+    }
+    const cleanTags = sanitiseTags(tags)
+    if (cleanTags.length === 0) {
+      return { ok: false, error: 'Enter at least one tag' }
+    }
+    const existing = readAutoTagRules()
+    if (existing.some((r) => canonicalPath(r.path) === canonicalPath(dirPath))) {
+      return { ok: false, error: 'A rule for this directory already exists' }
+    }
+    const rule: AutoTagRule = { id: randomUUID(), path: dirPath, tags: cleanTags }
+    writeAutoTagRules([...existing, rule])
+    invalidateSessionsCache()
+    return { ok: true, rule }
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('autotag:remove-rule', async (_e, id: string): Promise<{ ok: boolean; error?: string }> => {
+  try {
+    if (typeof id !== 'string' || !id) return { ok: false, error: 'Invalid rule id' }
+    const existing = readAutoTagRules()
+    const next = existing.filter((r) => r.id !== id)
+    if (next.length === existing.length) {
+      return { ok: false, error: 'Rule not found' }
+    }
+    writeAutoTagRules(next)
+    invalidateSessionsCache()
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+})
+

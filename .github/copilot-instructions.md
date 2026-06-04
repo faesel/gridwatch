@@ -48,6 +48,7 @@ Renderer (src/)
 | `~/.copilot/skills-disabled/<name>/` | Skills moved here when disabled via GridWatch toggle |
 | `~/.copilot/gridwatch-mcp-tools-cache.json` | Disk-persisted cache of MCP tool lists queried via JSON-RPC `tools/list` |
 | `~/.copilot/gridwatch-lsp-disabled.json` | LSP servers moved here when disabled via GridWatch toggle |
+| `~/.copilot/gridwatch-autotag-rules.json` | `{ "rules": [{ "id", "path", "tags": [...] }] }` — directory→tags auto-tagging rules |
 | `~/.copilot/agents/<name>.agent.md` | Custom agent profiles with YAML frontmatter (read-only) |
 | `localStorage` (renderer) | `gridwatch-settings` — zoom, fontSize, spacing |
 
@@ -159,9 +160,19 @@ gridwatch/
 
 **Session linking:** Sessions are linked to custom agents by matching `agent_type` values extracted from `events.jsonl` against the agent's name and display name (case-insensitive).
 
----
+### Auto-tag rules IPC
 
-## SkillData type
+| Method | IPC channel | Description |
+|---|---|---|
+| `getAutoTagRules()` | `autotag:get-rules` | Returns `AutoTagRule[]` from `gridwatch-autotag-rules.json` |
+| `getKnownTags()` | `autotag:get-known-tags` | Returns all distinct tags across sessions (typeahead source) |
+| `pickAutoTagDirectory()` | `autotag:pick-directory` | Opens a native directory picker, returns the chosen absolute path |
+| `addAutoTagRule(path, tags[])` | `autotag:add-rule` | Validates + appends a rule; rejects duplicate directories (platform-aware) |
+| `removeAutoTagRule(id)` | `autotag:remove-rule` | Removes the rule with the given id |
+
+**Auto-tag model:** Rules map a directory to a list of tags. At session load, each session whose `gitRoot` (falling back to `cwd`) equals or sits under a rule's directory receives that rule's tags as **derived** `autoTags` (computed in `loadAllSessions`, never written to the session's `gridwatch.json`). Tags already present in a session's manual `tags` are excluded from `autoTags`. Matching is case-insensitive on macOS/Windows and always includes subdirectories. Auto-tags are read-only in the Sessions view (managed only via Settings → Auto-tag rules) and rendered with a distinct ⛓ chip.
+
+
 
 ```typescript
 interface SkillData {
@@ -263,6 +274,7 @@ interface SessionData {
   lastUserMessage?: string
   userMessages: UserMessage[]   // all user.message events, field: event.data.content
   tags: string[]           // from gridwatch.json
+  autoTags: string[]       // derived at load from gridwatch-autotag-rules.json; never persisted
   notes: string
   rewindSnapshots: RewindSnapshot[]
   filesModified: string[]
