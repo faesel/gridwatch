@@ -33,6 +33,8 @@ contextBridge.exposeInMainWorld('gridwatchAPI', {
   openItemFolder: (type: string, name: string) => ipcRenderer.invoke('app:open-item-folder', type, name),
   saveToken: (token: string) => ipcRenderer.invoke('app:save-token', token),
   hasToken: () => ipcRenderer.invoke('app:has-token'),
+  setInputCaps: (caps: { summaryMaxLength: number; notesMaxLength: number; skillFileMaxBytes: number }) =>
+    ipcRenderer.invoke('app:set-input-caps', caps),
   analyseSession: (messages: string[]) =>
     ipcRenderer.invoke('insights:analyse', messages),
 

@@ -338,3 +338,65 @@
   padding: 0 4px;
   margin-left: auto;
 }
+
+/* ── Limits ───────────────────────────────────── */
+.limitsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.limitRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--tron-border);
+}
+
+.limitInfo {
+  min-width: 0;
+}
+
+.limitLabel {
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text);
+  letter-spacing: 0.8px;
+  margin-bottom: 2px;
+}
+
+.limitHint {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  letter-spacing: 0.4px;
+}
+
+.limitInputWrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.limitInput {
+  width: 108px;
+  background: var(--tron-bg);
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text);
+  font-family: inherit;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  padding: 6px 8px;
+  outline: none;
+}
+
+.limitInput:focus {
+  border-color: var(--tron-cyan);
+}
+
+.limitUnit {
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  letter-spacing: 1px;
+}

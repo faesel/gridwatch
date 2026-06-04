@@ -125,8 +125,58 @@ function isPathWithin(filePath: string, parentDir: string): boolean {
 }
 
 const MAX_TRANSFER_SIZE = 1_048_576 // 1 MB
+const MAX_SKILL_DESCRIPTION_LENGTH = 10_000
 
 const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/
+
+interface InputCaps {
+  summaryMaxLength: number
+  notesMaxLength: number
+  skillFileMaxBytes: number
+}
+
+const INPUT_CAP_BOUNDS = {
+  summaryMaxLength: { min: 100, max: 5_000 },
+  notesMaxLength: { min: 10_000, max: 500_000 },
+  skillFileMaxBytes: { min: 65_536, max: 2_097_152 },
+} as const
+
+const DEFAULT_INPUT_CAPS: InputCaps = {
+  summaryMaxLength: 1_000,
+  notesMaxLength: 100_000,
+  skillFileMaxBytes: 524_288,
+}
+
+let inputCaps: InputCaps = { ...DEFAULT_INPUT_CAPS }
+
+function clampInputCap(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback
+  const rounded = Math.round(value)
+  return Math.min(max, Math.max(min, rounded))
+}
+
+function normaliseInputCaps(caps: Partial<InputCaps>): InputCaps {
+  return {
+    summaryMaxLength: clampInputCap(
+      caps.summaryMaxLength,
+      INPUT_CAP_BOUNDS.summaryMaxLength.min,
+      INPUT_CAP_BOUNDS.summaryMaxLength.max,
+      inputCaps.summaryMaxLength,
+    ),
+    notesMaxLength: clampInputCap(
+      caps.notesMaxLength,
+      INPUT_CAP_BOUNDS.notesMaxLength.min,
+      INPUT_CAP_BOUNDS.notesMaxLength.max,
+      inputCaps.notesMaxLength,
+    ),
+    skillFileMaxBytes: clampInputCap(
+      caps.skillFileMaxBytes,
+      INPUT_CAP_BOUNDS.skillFileMaxBytes.min,
+      INPUT_CAP_BOUNDS.skillFileMaxBytes.max,
+      inputCaps.skillFileMaxBytes,
+    ),
+  }
+}
 
 // ── IPC response cache ────────────────────────────────────────────────────────
 let sessionsCache: { data: SessionData[]; timestamp: number } | null = null
@@ -663,7 +713,7 @@ ipcMain.handle('sessions:rename', async (_event, sessionId: string, newSummary: 
 
     // Sanitise newlines to prevent YAML key injection
     const safeSummary = newSummary.replace(/[\r\n]+/g, ' ').trim()
-    if (!safeSummary || safeSummary.length > 1000) return false
+    if (!safeSummary || safeSummary.length > inputCaps.summaryMaxLength) return false
 
     const raw = fs.readFileSync(yamlPath, 'utf-8')
     let updated: string
@@ -767,7 +817,7 @@ ipcMain.handle('sessions:set-notes', async (_e, sessionId: string, notes: string
   invalidateSessionsCache()
   try {
     if (!isValidSessionId(sessionId)) return false
-    const safeNotes = typeof notes === 'string' ? notes.slice(0, 100_000) : ''
+    const safeNotes = typeof notes === 'string' ? notes.slice(0, inputCaps.notesMaxLength) : ''
     const sessionDir = path.join(os.homedir(), '.copilot', 'session-state', sessionId)
     if (!fs.existsSync(sessionDir)) return false
     const metaFile = path.join(sessionDir, 'gridwatch.json')
@@ -1053,6 +1103,12 @@ ipcMain.handle('app:has-token', async (): Promise<boolean> => {
   }
 })
 
+ipcMain.handle('app:set-input-caps', async (_e, caps: Partial<InputCaps>): Promise<InputCaps> => {
+  if (!caps || typeof caps !== 'object') return inputCaps
+  inputCaps = normaliseInputCaps(caps)
+  return inputCaps
+})
+
 // ── IPC: insights:analyse ──────────────────────────────────────────────────
 
 const INSIGHTS_SYSTEM_PROMPT = `You are an expert prompt engineering coach. You analyse prompts sent to GitHub Copilot CLI and provide actionable feedback.
@@ -1277,7 +1333,7 @@ ipcMain.handle('skills:get-file', async (_e, skillName: string, fileName: string
 
 ipcMain.handle('skills:save-file', async (_e, skillName: string, fileName: string, content: string): Promise<boolean> => {
   if (!isValidSkillName(skillName) || !fileName || typeof content !== 'string') return false
-  if (!fileName.endsWith('.md') || content.length > 524_288) return false
+  if (!fileName.endsWith('.md') || content.length > inputCaps.skillFileMaxBytes) return false
   const enabledDir = path.join(os.homedir(), '.copilot', 'skills')
   const disabledDir = path.join(os.homedir(), '.copilot', 'skills-disabled')
 
@@ -1299,7 +1355,10 @@ ipcMain.handle('skills:create', async (_e, name: string, description: string): P
   const disabledDir = path.join(os.homedir(), '.copilot', 'skills-disabled', name)
   if (fs.existsSync(disabledDir)) return { ok: false, error: 'A disabled skill with this name already exists.' }
 
-  const safeDescription = (description || 'TODO: Add a description').replace(/[\r\n]+/g, ' ').trim()
+  const safeDescription = (description || '')
+    .replace(/[\r\n]+/g, ' ')
+    .trim()
+    .slice(0, MAX_SKILL_DESCRIPTION_LENGTH) || 'TODO: Add a description'
   const template = `---\nname: ${name}\ndescription: ${safeDescription}\n---\n\n# ${name}\n\nAdd your skill instructions here.\n`
 
   try {
