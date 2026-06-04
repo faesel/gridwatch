@@ -66,9 +66,9 @@
 
 .presetBtnActive {
   border-color: var(--tron-cyan) !important;
-  background: rgba(0, 245, 255, 0.1) !important;
+  background: color-mix(in srgb, var(--tron-cyan) 10%, transparent) !important;
   color: var(--tron-cyan);
-  box-shadow: 0 0 8px rgba(0, 245, 255, 0.2);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--tron-cyan) 20%, transparent);
 }
 
 .presetBtnWide {
@@ -83,7 +83,7 @@
 }
 
 .presetBtnActive .presetSub {
-  color: rgba(0, 245, 255, 0.6);
+  color: color-mix(in srgb, var(--tron-cyan) 60%, transparent);
 }
 
 .preview {

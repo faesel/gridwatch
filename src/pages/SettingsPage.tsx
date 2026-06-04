@@ -409,7 +409,7 @@ function SettingsPage({ settings, onChange }: Props) {
         <div className={styles.sectionTitle}>AUTO-TAG RULES</div>
         <div className={styles.description}>
           Automatically apply tags to any session whose working directory falls under a chosen folder
-          (including its subdirectories). Auto-tags appear on sessions in <span style={{ color: 'var(--tron-orange)' }}>orange</span> and
+          (including its subdirectories). Auto-tags appear on sessions with a dashed outline and a ⛓ marker, and
           can only be changed here. Matching is case-insensitive on macOS and Windows.
         </div>
 

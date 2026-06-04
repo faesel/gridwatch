@@ -743,6 +743,40 @@
   flex-shrink: 0;
 }
 
+.infoTip {
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  cursor: help;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+  position: relative;
+}
+
+.infoTip:hover {
+  opacity: 1;
+  color: var(--tron-cyan);
+}
+
+.infoTip:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  background: var(--tron-panel);
+  border: 1px solid var(--tron-border);
+  color: var(--tron-text);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 0.3px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  white-space: normal;
+  width: max-content;
+  max-width: 280px;
+  z-index: 100;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
 .tagsRow {
   display: flex;
   flex-wrap: wrap;

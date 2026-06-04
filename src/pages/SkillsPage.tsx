@@ -679,6 +679,10 @@ function SkillsPage({ refreshKey, onNavigateToAgent }: { refreshKey?: number; on
             {parentSkills.length > 0 && (
               <div className={styles.relationGroup}>
                 <span className={styles.tagsSectionLabel}>PARENT SKILLS</span>
+                <span
+                  className={styles.infoTip}
+                  data-tip="Skills that list this skill as a child. This skill appears nested beneath them in the skills list. Click a linked parent skill to open it."
+                >ⓘ</span>
                 <div className={styles.tagsRow}>
                   {parentSkills.map((parent) => (
                     <span
@@ -696,6 +700,10 @@ function SkillsPage({ refreshKey, onNavigateToAgent }: { refreshKey?: number; on
 
             <div className={styles.relationGroup}>
               <span className={styles.tagsSectionLabel}>CHILD SKILLS</span>
+              <span
+                className={styles.infoTip}
+                data-tip="Skills this skill depends on or invokes. Linked child skills appear nested beneath this skill in the list, where they can be expanded or collapsed. Click a linked skill to open it."
+              >ⓘ</span>
               <div className={styles.tagsRow}>
                 {localChildSkills.map((name) => {
                   const child = nameToSkill.get(name)
@@ -725,6 +733,10 @@ function SkillsPage({ refreshKey, onNavigateToAgent }: { refreshKey?: number; on
 
             <div className={styles.relationGroup}>
               <span className={styles.tagsSectionLabel}>LINKED AGENTS</span>
+              <span
+                className={styles.infoTip}
+                data-tip="Agents that run as part of this skill. Click a linked agent to switch to the Agents panel and open its detail view."
+              >ⓘ</span>
               <div className={styles.tagsRow}>
                 {localLinkedAgents.map((name) => {
                   const agent = agents.find((a) => a.name === name)
