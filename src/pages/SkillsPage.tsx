@@ -14,7 +14,7 @@ function stripFrontmatter(raw: string): string {
 
 type DialogMode = 'create' | 'rename-folder' | 'duplicate' | 'delete' | null
 
-function SkillsPage({ refreshKey }: { refreshKey?: number }) {
+function SkillsPage({ refreshKey, onNavigateToAgent }: { refreshKey?: number; onNavigateToAgent?: (agentName: string) => void }) {
   const [skills, setSkills] = useState<SkillData[]>([])
   const [selected, setSelected] = useState<SkillData | null>(null)
   const [search, setSearch] = useState('')
@@ -257,6 +257,12 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
       .filter((a) => !localLinkedAgents.includes(a.name))
       .map((a) => ({ id: a.name, label: a.displayName || a.name }))
   , [agents, localLinkedAgents])
+
+  // Skills that declare the currently-selected skill as a child
+  const parentSkills = useMemo(() => {
+    if (!selected) return []
+    return skills.filter((s) => (s.childSkills ?? []).includes(selected.name))
+  }, [skills, selected])
 
   const persistRelations = useCallback(async (children: string[], linked: string[]) => {
     if (!selected) return
@@ -670,6 +676,24 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
           </div>
 
           <div className={styles.relationsSection}>
+            {parentSkills.length > 0 && (
+              <div className={styles.relationGroup}>
+                <span className={styles.tagsSectionLabel}>PARENT SKILLS</span>
+                <div className={styles.tagsRow}>
+                  {parentSkills.map((parent) => (
+                    <span
+                      key={parent.name}
+                      className={`${styles.relationChip} ${styles.relationChipClickable}`}
+                      onClick={() => handleSelectSkill(parent)}
+                      title={`Open ${parent.displayName}`}
+                    >
+                      ⬑ {parent.displayName}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className={styles.relationGroup}>
               <span className={styles.tagsSectionLabel}>CHILD SKILLS</span>
               <div className={styles.tagsRow}>
@@ -707,13 +731,14 @@ function SkillsPage({ refreshKey }: { refreshKey?: number }) {
                   return (
                     <span
                       key={name}
-                      className={`${styles.relationChip} ${agent ? '' : styles.relationChipMissing}`}
-                      title={agent ? agent.description : 'Agent no longer exists'}
+                      className={`${styles.relationChip} ${agent ? styles.relationChipClickable : styles.relationChipMissing}`}
+                      onClick={agent && onNavigateToAgent ? () => onNavigateToAgent(name) : undefined}
+                      title={agent ? `Open agent ${agent.displayName || agent.name}` : 'Agent no longer exists'}
                     >
                       {agent ? (agent.displayName || agent.name) : `${name} (missing)`}
                       <button
                         className={styles.tagRemove}
-                        onClick={() => removeLinkedAgent(name)}
+                        onClick={(e) => { e.stopPropagation(); removeLinkedAgent(name) }}
                         aria-label={`Remove linked agent ${name}`}
                       >×</button>
                     </span>

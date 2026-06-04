@@ -61,11 +61,17 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [update, setUpdate] = useState<{ latestVersion: string; downloadUrl: string } | null>(null)
   const [platform, setPlatform] = useState<string>('darwin')
+  const [focusAgent, setFocusAgent] = useState<string | null>(null)
   const [appSettings, setAppSettings] = useState<AppSettings>(() => {
     const s = loadSettings()
     applySettings(s)
     return s
   })
+
+  const navigateToAgent = (agentName: string) => {
+    setFocusAgent(agentName)
+    setActivePage('agents')
+  }
 
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -104,10 +110,10 @@ function App() {
       case 'sessions': return <SessionsPage sessions={sessions} onSessionRenamed={load} />
       case 'tokens': return <TokensPage sessions={sessions} />
       case 'activity': return <ActivityPage sessions={sessions} />
-      case 'skills': return <SkillsPage refreshKey={refreshKey} />
+      case 'skills': return <SkillsPage refreshKey={refreshKey} onNavigateToAgent={navigateToAgent} />
       case 'mcp': return <McpPage refreshKey={refreshKey} />
       case 'lsp': return <LspPage refreshKey={refreshKey} />
-      case 'agents': return <AgentsPage sessions={sessions} refreshKey={refreshKey} />
+      case 'agents': return <AgentsPage sessions={sessions} refreshKey={refreshKey} focusAgent={focusAgent} onFocusHandled={() => setFocusAgent(null)} />
       case 'insights': return <InsightsPage sessions={sessions} />
       case 'transfer': return <TransferPage sessions={sessions} />
       case 'settings': return <SettingsPage settings={appSettings} onChange={setAppSettings} />

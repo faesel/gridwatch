@@ -125,9 +125,11 @@ function renderMarkdown(raw: string) {
 interface AgentsPageProps {
   sessions: SessionSummary[]
   refreshKey: number
+  focusAgent?: string | null
+  onFocusHandled?: () => void
 }
 
-function AgentsPage({ sessions, refreshKey }: AgentsPageProps) {
+function AgentsPage({ sessions, refreshKey, focusAgent, onFocusHandled }: AgentsPageProps) {
   const [selected, setSelected] = useState<AgentType | null>(null)
   const [sessionSearch, setSessionSearch] = useState('')
   const [customAgents, setCustomAgents] = useState<CustomAgentData[]>([])
@@ -180,6 +182,17 @@ function AgentsPage({ sessions, refreshKey }: AgentsPageProps) {
   }
 
   const displayedAgent = syncedSelected
+
+  // When navigated to from another page (e.g. a skill's linked-agent chip),
+  // select the matching custom agent once it has loaded, then clear the request.
+  useEffect(() => {
+    if (!focusAgent) return
+    const target = agentTypes.find((a) => a.kind === 'custom' && a.data.name === focusAgent)
+    if (target) {
+      handleSelect(target)
+      onFocusHandled?.()
+    }
+  }, [focusAgent, agentTypes])
 
   const filteredSessions = useMemo(() => {
     if (!displayedAgent || displayedAgent.sessions.length === 0) return []
