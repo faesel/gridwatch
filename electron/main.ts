@@ -361,8 +361,12 @@ async function loadAllSessions(): Promise<SessionData[]> {
               turnCount++
               const msg = (event.data?.content || event.data?.message) as string | undefined
               if (msg) {
-                lastUserMessage = msg
                 userMessages.push({ content: msg, timestamp: event.timestamp })
+                // Skip system-injected skill-context blocks and empty messages when
+                // deriving the title fallback — they are not genuine user prompts.
+                if (msg.trim() && !msg.trimStart().startsWith('<skill-context')) {
+                  lastUserMessage = msg
+                }
               }
             }
             if (event.type === 'tool.execution_start' && event.data?.toolName) {
@@ -471,7 +475,9 @@ async function loadAllSessions(): Promise<SessionData[]> {
           gitRoot: workspace.git_root || undefined,
           repository: workspace.repository || undefined,
           branch: workspace.branch || undefined,
-          summary: workspace.summary || undefined,
+          // Prefer GridWatch's own summary (legacy renames); fall back to Copilot's
+          // session `name` so renames that Copilot persisted are still honoured.
+          summary: workspace.summary || workspace.name || undefined,
           summaryCount: parseInt(workspace.summary_count || workspace.summaryCount || '0', 10) || 0,
           createdAt,
           updatedAt,
@@ -689,12 +695,22 @@ ipcMain.handle('sessions:rename', async (_event, sessionId: string, newSummary: 
     if (!safeSummary || safeSummary.length > 1000) return false
 
     const raw = fs.readFileSync(yamlPath, 'utf-8')
-    let updated: string
-    if (/^summary:.*$/m.test(raw)) {
-      updated = raw.replace(/^summary:.*$/m, `summary: ${safeSummary}`)
-    } else {
-      updated = raw.trimEnd() + `\nsummary: ${safeSummary}\n`
+
+    // Write/update a YAML scalar field, quoting the value (JSON encoding is valid
+    // YAML flow scalar) so colons/quotes in the title can't break the document.
+    const setField = (text: string, key: string, value: string): string => {
+      const re = new RegExp(`^${key}:.*$`, 'm')
+      if (re.test(text)) return text.replace(re, `${key}: ${value}`)
+      return text.trimEnd() + `\n${key}: ${value}\n`
     }
+
+    let updated = raw
+    // `name` + `user_named: true` mirror Copilot CLI's own user-rename mechanism so
+    // the rename survives Copilot rewriting workspace.yaml on later activity.
+    updated = setField(updated, 'name', JSON.stringify(safeSummary))
+    updated = setField(updated, 'user_named', 'true')
+    // Keep `summary` in sync for backward-compatible reads.
+    updated = setField(updated, 'summary', JSON.stringify(safeSummary))
     fs.writeFileSync(yamlPath, updated, 'utf-8')
     return true
   } catch {

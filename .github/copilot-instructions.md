@@ -101,7 +101,7 @@ gridwatch/
 |---|---|---|
 | `getSessions()` | `sessions:get-all` | Returns `SessionData[]` sorted by updatedAt desc |
 | `getLogTokens()` | `sessions:get-log-tokens` | Returns `{ date, tokens, utilisation }[]` per log file |
-| `renameSession(id, summary)` | `sessions:rename` | Rewrites summary in workspace.yaml |
+| `renameSession(id, summary)` | `sessions:rename` | Writes `name` + `user_named: true` (and `summary`) in workspace.yaml so the rename survives Copilot's own rewrites |
 | `archiveSession(id)` | `sessions:archive` | Moves session dir to `~/.copilot/session-state-archived/` |
 | `deleteSession(id)` | `sessions:delete` | `fs.rmSync` the session dir |
 | `setTags(id, tags[])` | `sessions:set-tags` | Writes/merges tags into `gridwatch.json` |
