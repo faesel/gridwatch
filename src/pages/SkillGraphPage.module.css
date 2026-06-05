@@ -1,0 +1,218 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--tron-border);
+  flex-shrink: 0;
+}
+
+.title {
+  color: var(--tron-cyan);
+  font-size: calc(13 * var(--font-scale, 1) * 1px);
+  letter-spacing: 2px;
+  text-shadow: var(--tron-glow-cyan);
+}
+
+.pickerLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--tron-text-dim);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+}
+
+.picker {
+  background: var(--tron-panel);
+  border: 1px solid var(--tron-border);
+  color: var(--tron-cyan);
+  font-family: inherit;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  padding: 6px 10px;
+  cursor: pointer;
+  min-width: 200px;
+  transition: all 0.15s;
+}
+
+.picker:hover:not(:disabled) {
+  border-color: var(--tron-cyan);
+  box-shadow: var(--tron-glow-cyan);
+}
+
+.picker:disabled {
+  color: var(--tron-text-dim);
+  cursor: not-allowed;
+}
+
+/* ── Legend ─────────────────────────────────── */
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tron-text-dim);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  letter-spacing: 0.5px;
+}
+
+.swatchSkill,
+.swatchAgent {
+  width: 10px;
+  height: 10px;
+  border: 1px solid;
+  display: inline-block;
+}
+
+.swatchSkill {
+  border-color: var(--tron-cyan);
+  background: color-mix(in srgb, var(--tron-cyan) 12%, transparent);
+}
+
+.swatchAgent {
+  border-color: var(--tron-orange);
+  background: color-mix(in srgb, var(--tron-orange) 12%, transparent);
+}
+
+.lineBlue,
+.lineOrange {
+  width: 16px;
+  height: 0;
+  border-top: 2px solid;
+  display: inline-block;
+}
+
+.lineBlue { border-color: var(--tron-blue); }
+.lineOrange { border-color: var(--tron-orange); }
+
+.legendHint {
+  color: var(--tron-text-dim);
+  font-size: calc(10 * var(--font-scale, 1) * 1px);
+  font-style: italic;
+}
+
+/* ── Canvas ─────────────────────────────────── */
+.canvas {
+  flex: 1;
+  position: relative;
+  background: var(--tron-bg);
+  min-height: 0;
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0 48px;
+  text-align: center;
+  color: var(--tron-text-dim);
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
+  letter-spacing: 1px;
+  line-height: 1.6;
+}
+
+/* ── Nodes ──────────────────────────────────── */
+.node {
+  width: 200px;
+  padding: 10px 12px;
+  background: var(--tron-panel);
+  border: 1px solid var(--tron-border);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.skillNode {
+  border-color: var(--tron-cyan);
+}
+
+.skillNode:hover {
+  box-shadow: var(--tron-glow-cyan);
+}
+
+.agentNode {
+  border-color: var(--tron-orange);
+}
+
+.agentNode:hover {
+  box-shadow: var(--tron-glow-orange);
+}
+
+.disabled {
+  opacity: 0.5;
+  border-style: dashed;
+}
+
+.nodeKind {
+  color: var(--tron-cyan);
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+
+.nodeKindAgent {
+  color: var(--tron-orange);
+  font-size: calc(9 * var(--font-scale, 1) * 1px);
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+
+.nodeLabel {
+  color: var(--tron-text);
+  font-size: calc(12 * var(--font-scale, 1) * 1px);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.handle {
+  width: 6px;
+  height: 6px;
+  background: var(--tron-bg);
+  border: 1px solid var(--tron-text-dim);
+}
+
+/* ── React Flow chrome overrides ────────────── */
+.canvas :global(.react-flow__controls) {
+  background: var(--tron-panel);
+  border: 1px solid var(--tron-border);
+  box-shadow: none;
+}
+
+.canvas :global(.react-flow__controls-button) {
+  background: var(--tron-panel);
+  border-bottom: 1px solid var(--tron-border);
+  color: var(--tron-cyan);
+  fill: var(--tron-cyan);
+}
+
+.canvas :global(.react-flow__controls-button:hover) {
+  background: var(--tron-panel-hover);
+}
+
+.minimap {
+  background: var(--tron-panel) !important;
+  border: 1px solid var(--tron-border);
+}
+
+.canvas :global(.react-flow__attribution) {
+  display: none;
+}

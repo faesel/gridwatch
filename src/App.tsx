@@ -1,4 +1,4 @@
-import { useState, useEffect, Component } from 'react'
+import { useState, useEffect, Component, lazy, Suspense } from 'react'
 import type { ReactNode } from 'react'
 import type { SessionSummary } from './types/session'
 import styles from './App.module.css'
@@ -11,6 +11,7 @@ import SettingsPage, { loadSettings, applySettings } from './pages/SettingsPage'
 import InsightsPage from './pages/InsightsPage'
 import TransferPage from './pages/TransferPage'
 import SkillsPage from './pages/SkillsPage'
+const SkillGraphPage = lazy(() => import('./pages/SkillGraphPage'))
 import McpPage from './pages/McpPage'
 import LspPage from './pages/LspPage'
 import AgentsPage from './pages/AgentsPage'
@@ -47,6 +48,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'tokens', label: 'TOKENS', icon: '◬' },
   { id: 'activity', label: 'ACTIVITY', icon: '◫' },
   { id: 'skills', label: 'SKILLS', icon: '✦' },
+  { id: 'graph', label: 'SKILLS GRAPH', icon: '⌬' },
   { id: 'mcp', label: 'MCP', icon: '⧈' },
   { id: 'lsp', label: 'LSP', icon: '⬡' },
   { id: 'agents', label: 'AGENTS', icon: '◎' },
@@ -62,6 +64,7 @@ function App() {
   const [update, setUpdate] = useState<{ latestVersion: string; downloadUrl: string } | null>(null)
   const [platform, setPlatform] = useState<string>('darwin')
   const [focusAgent, setFocusAgent] = useState<string | null>(null)
+  const [focusSkill, setFocusSkill] = useState<string | null>(null)
   const [appSettings, setAppSettings] = useState<AppSettings>(() => {
     const s = loadSettings()
     applySettings(s)
@@ -71,6 +74,11 @@ function App() {
   const navigateToAgent = (agentName: string) => {
     setFocusAgent(agentName)
     setActivePage('agents')
+  }
+
+  const navigateToSkill = (skillName: string) => {
+    setFocusSkill(skillName)
+    setActivePage('skills')
   }
 
   const [refreshKey, setRefreshKey] = useState(0)
@@ -110,7 +118,8 @@ function App() {
       case 'sessions': return <SessionsPage sessions={sessions} onSessionRenamed={load} />
       case 'tokens': return <TokensPage sessions={sessions} />
       case 'activity': return <ActivityPage sessions={sessions} />
-      case 'skills': return <SkillsPage refreshKey={refreshKey} onNavigateToAgent={navigateToAgent} />
+      case 'skills': return <SkillsPage refreshKey={refreshKey} onNavigateToAgent={navigateToAgent} focusSkill={focusSkill} onFocusHandled={() => setFocusSkill(null)} />
+      case 'graph': return <Suspense fallback={<div className={styles.loading}>LOADING GRAPH…</div>}><SkillGraphPage refreshKey={refreshKey} onNavigateToSkill={navigateToSkill} onNavigateToAgent={navigateToAgent} /></Suspense>
       case 'mcp': return <McpPage refreshKey={refreshKey} />
       case 'lsp': return <LspPage refreshKey={refreshKey} />
       case 'agents': return <AgentsPage sessions={sessions} refreshKey={refreshKey} focusAgent={focusAgent} onFocusHandled={() => setFocusAgent(null)} />

@@ -1,7 +1,7 @@
 {
   "name": "gridwatch",
   "private": true,
-  "version": "0.34.1",
+  "version": "0.35.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@fontsource/jetbrains-mono": "^5.2.8",
+    "@xyflow/react": "^12.11.0",
     "dompurify": "^3.4.8",
     "js-yaml": "^4.2.0",
     "marked": "^17.0.3",

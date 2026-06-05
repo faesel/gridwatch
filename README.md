@@ -50,6 +50,7 @@ GridWatch reads the local session data written by [GitHub Copilot CLI](https://g
 - ⛓ **Directory-based auto-tag rules** — define rules in Settings that map a directory to one or more tags; any session whose working directory sits under that directory is automatically tagged. Auto-tags are derived at load time (never written to disk), shown read-only with a distinct ⛓ chip, and are searchable and filterable like manual tags
 - ✦ **Skills management** — browse, create, edit, duplicate, delete, and search your Copilot CLI skills (`~/.copilot/skills/`). View rendered markdown with Tron-themed styling, toggle skills on/off, rename folders, import from files or folders, and export as zip archives. Tag skills with custom labels and filter by tags
 - 🔗 **Skill relationships** — link child skills to a parent skill and link the agents a skill invokes. Child skills are nested under their parent in the list with an expand/collapse accordion and indented, colour-coded markers; nesting is preserved even while filtering. The detail panel shows each skill's child skills, linked agents, and parent skills. Relationship chips are clickable — jump between parent and child skills, or flip to the Agents panel and open a linked agent's detail view
+- ⌬ **Skills graph** — an interactive relationship map (built with React Flow) of how your skills connect. Pick a parent skill and see it rendered as a node-link diagram: child skills laid out by depth, the agents each skill invokes shown alongside, and colour-coded edges (invokes / uses-agent). Double-click any node to jump straight to that skill or agent. Fully Tron-themed with pan, zoom, and minimap
 - ◈ **MCP server dashboard** — view all installed Model Context Protocol servers (local stdio and remote HTTP), enable/disable servers to manage context window bloat, browse their full tool catalogues grouped by category with descriptions and parameter schemas (queried live via JSON-RPC `tools/list`), see environment variables (with secret masking), connection times, and command details
 - ⬡ **LSP server dashboard** — view all configured Language Server Protocol servers from `~/.copilot/lsp-config.json`, enable/disable individual servers, see command details and file extension mappings. Gives you full visibility into the code intelligence available to Copilot CLI
 - ◎ **Agents panel** — view built-in Copilot agents (Research, Code Review, Coding) alongside your custom agents from `~/.copilot/agents/`. See session counts, usage stats, and linked session history per agent. Custom agents display with an orange CUSTOM badge, rendered markdown file viewer with Tron-themed styling, and file tabs for multi-file agents. Session lists default to the 5 most recent with a "show all" toggle for performance
@@ -76,6 +77,10 @@ GridWatch reads the local session data written by [GitHub Copilot CLI](https://g
 ### Skills
 
 ![Skills](public/images/screenshot-skills.png)
+
+### Skills Graph
+
+![Skills Graph](public/images/screenshot-skills-graph.png)
 
 ### MCP Servers
 
@@ -178,6 +183,7 @@ gridwatch/
 │   │   ├── TokensPage.tsx      # Token usage charts
 │   │   ├── ActivityPage.tsx    # Heatmap + activity analytics
 │   │   ├── SkillsPage.tsx      # Copilot skills browser and editor
+│   │   ├── SkillGraphPage.tsx  # Skills relationship graph (React Flow)
 │   │   ├── McpPage.tsx         # MCP server dashboard + tool catalogue
 │   │   ├── LspPage.tsx         # LSP server dashboard + enable/disable
 │   │   ├── AgentsPage.tsx      # Built-in + custom agents with session linking
@@ -304,6 +310,7 @@ The Settings page provides UI preferences and Copilot CLI configuration manageme
 | Packaging          | electron-builder                    |
 | Styling            | CSS Modules + CSS custom properties |
 | Charts             | Recharts                            |
+| Graph view         | React Flow (@xyflow/react)          |
 | Markdown rendering | marked                              |
 | YAML parsing       | js-yaml                             |
 | Font               | JetBrains Mono (@fontsource)        |

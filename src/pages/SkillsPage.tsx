@@ -14,7 +14,7 @@ function stripFrontmatter(raw: string): string {
 
 type DialogMode = 'create' | 'rename-folder' | 'duplicate' | 'delete' | null
 
-function SkillsPage({ refreshKey, onNavigateToAgent }: { refreshKey?: number; onNavigateToAgent?: (agentName: string) => void }) {
+function SkillsPage({ refreshKey, onNavigateToAgent, focusSkill, onFocusHandled }: { refreshKey?: number; onNavigateToAgent?: (agentName: string) => void; focusSkill?: string | null; onFocusHandled?: () => void }) {
   const [skills, setSkills] = useState<SkillData[]>([])
   const [selected, setSelected] = useState<SkillData | null>(null)
   const [search, setSearch] = useState('')
@@ -58,6 +58,18 @@ function SkillsPage({ refreshKey, onNavigateToAgent }: { refreshKey?: number; on
 
   // Refresh when parent triggers via refreshKey
   useEffect(() => { if (refreshKey) loadSkills() }, [refreshKey, loadSkills])
+
+  // When navigated to from another page (e.g. a graph node), select that skill once loaded.
+  useEffect(() => {
+    if (!focusSkill) return
+    const target = skills.find((s) => s.name === focusSkill)
+    if (target) {
+      setSelected(target)
+      setActiveFile('SKILL.md')
+      setActionError(null)
+      onFocusHandled?.()
+    }
+  }, [focusSkill, skills, onFocusHandled])
 
   // Load file content when selected skill or active file changes
   useEffect(() => {
