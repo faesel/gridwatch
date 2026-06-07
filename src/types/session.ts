@@ -60,6 +60,15 @@ export interface SessionSummary {
   notes: string;
   peakTokens: number;
   peakUtilisation: number;
+  /** Context-window size (denominator) seen on the peak utilisation log line, if known. */
+  contextWindow?: number;
+  /** First recorded token count / utilisation for the session ("Initial"), if known. */
+  initialTokens?: number;
+  initialUtilisation?: number;
+  /** True when this session's process log was pruned by Copilot (so token data is unavailable). */
+  tokenLogPruned: boolean;
+  /** True when token stats came from a persisted gridwatch.json snapshot, not a live log. */
+  tokenStatsCached?: boolean;
   isResearch: boolean;
   isReview: boolean;
   agentTypes: string[];

@@ -656,22 +656,24 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
           )}
 
           {/* Token bar */}
-          {selectedSession.peakUtilisation > 0 && (
+          {selectedSession.peakUtilisation > 0 ? (
             <div className={styles.section}>
               <div className={styles.sectionTitle}>TOKEN UTILISATION</div>
               <div className={styles.tokenBars}>
-                {(sessionDetail?.tokenHistory.length ?? 0) > 0 && (() => {
-                  const first = sessionDetail!.tokenHistory[0]
+                {selectedSession.initialUtilisation != null && (() => {
+                  const initUtil = selectedSession.initialUtilisation as number
+                  const initTok = selectedSession.initialTokens
+                  const win = selectedSession.contextWindow
                   return (
                     <div className={styles.tokenBarRow}>
                       <span className={styles.tokenBarRowLabel}>Initial</span>
-                      <div className={styles.tokenBar} title={`Initial: ${first.utilisation.toFixed(1)}% — ${first.tokens.toLocaleString()} tokens`}>
+                      <div className={styles.tokenBar} title={`Initial: ${initUtil.toFixed(1)}%${initTok != null ? ` — ${initTok.toLocaleString()}${win ? ` / ${win.toLocaleString()}` : ''} tokens` : ''}`}>
                         <div
                           className={styles.tokenBarFillCurrent}
-                          style={{ width: `${Math.min(100, first.utilisation)}%` }}
+                          style={{ width: `${Math.min(100, initUtil)}%` }}
                         />
                         <span className={styles.tokenBarLabel}>
-                          {first.utilisation.toFixed(1)}% · {first.tokens.toLocaleString()} tokens
+                          {initUtil.toFixed(1)}%{initTok != null ? ` · ${initTok.toLocaleString()} tokens` : ''}
                         </span>
                       </div>
                     </div>
@@ -679,7 +681,7 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
                 })()}
                 <div className={styles.tokenBarRow}>
                   <span className={styles.tokenBarRowLabel}>Peak</span>
-                  <div className={styles.tokenBar} title={`Peak: ${selectedSession.peakUtilisation.toFixed(1)}% — ${selectedSession.peakTokens.toLocaleString()} tokens`}>
+                  <div className={styles.tokenBar} title={`Peak: ${selectedSession.peakUtilisation.toFixed(1)}% — ${selectedSession.peakTokens.toLocaleString()}${selectedSession.contextWindow ? ` / ${selectedSession.contextWindow.toLocaleString()}` : ''} tokens`}>
                     <div
                       className={styles.tokenBarFillPeak}
                       style={{ width: `${Math.min(100, selectedSession.peakUtilisation)}%` }}
@@ -690,8 +692,20 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
                   </div>
                 </div>
               </div>
+              {selectedSession.tokenStatsCached && (
+                <div className={styles.tokenNote} style={{ marginTop: '6px', fontSize: 'calc(10 * var(--font-scale, 1) * 1px)' }}>
+                  From saved snapshot — Copilot's process log for this session has been pruned.
+                </div>
+              )}
             </div>
-          )}
+          ) : selectedSession.tokenLogPruned ? (
+            <div className={styles.section}>
+              <div className={styles.sectionTitle}>TOKEN UTILISATION</div>
+              <div className={styles.tokenNote}>
+                Utilisation unavailable — Copilot has pruned the process logs for this session.
+              </div>
+            </div>
+          ) : null}
 
           {/* Context cost breakdown */}
           {sessionDetail?.contextCost && sessionDetail.contextCost.items.length > 0 && (

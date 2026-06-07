@@ -170,7 +170,7 @@ function TokensPage({ sessions }: Props) {
               />
             </LineChart>
           </ResponsiveContainer>
-          <div className={styles.contextNote}>Context window: 128,000 tokens</div>
+          <div className={styles.contextNote}>Peak tokens per day. The context window varies by model, so absolute counts aren't directly comparable.</div>
         </div>
       )}
 
@@ -189,7 +189,7 @@ function TokensPage({ sessions }: Props) {
             </thead>
             <tbody>
               {sortedSessions.map((s, i) => {
-                  const pct = (s.peakTokens / 128000) * 100
+                  const pct = s.peakUtilisation
                   const repo = s.repository || basename(s.cwd)
                   const summary = s.summary || s.lastUserMessage || '—'
                   return (

@@ -733,6 +733,13 @@
   text-align: right;
 }
 
+.tokenNote {
+  width: 100%;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  line-height: 1.5;
+  color: var(--tron-text-dim);
+}
+
 .tokenBar {
   flex: 1;
   height: 20px;

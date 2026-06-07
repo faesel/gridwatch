@@ -144,120 +144,247 @@ function invalidateSessionsCache() {
   sessionsCache = null
 }
 
+// ── Session gridwatch.json: serialised, atomic read-modify-write ───────────────
+// All writes to a session's gridwatch.json (tags, notes, tokenStats) funnel through
+// mutateSessionMeta so concurrent writers can't lose each other's updates, and writes
+// are atomic (temp file + rename) so a crash can't truncate the file.
+
+const metaWriteQueues = new Map<string, Promise<void>>()
+
+function sessionMetaPath(sessionId: string): string {
+  return path.join(os.homedir(), '.copilot', 'session-state', sessionId, 'gridwatch.json')
+}
+
+// Returns the parsed object, {} if missing, or null if the file exists but is unreadable/invalid.
+function readSessionMetaSync(file: string): Record<string, unknown> | null {
+  if (!fs.existsSync(file)) return {}
+  try {
+    const d = JSON.parse(fs.readFileSync(file, 'utf-8'))
+    return d && typeof d === 'object' && !Array.isArray(d) ? (d as Record<string, unknown>) : {}
+  } catch {
+    return null
+  }
+}
+
+function atomicWriteJson(file: string, data: unknown): void {
+  const tmp = `${file}.tmp-${process.pid}-${Date.now()}`
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf-8')
+  fs.renameSync(tmp, file)
+}
+
+// Queue a read-modify-write for a session's gridwatch.json. The mutator receives the current
+// meta object and returns the object to write, or null to skip the write entirely.
+function mutateSessionMeta(
+  sessionId: string,
+  mutator: (meta: Record<string, unknown>) => Record<string, unknown> | null,
+): Promise<void> {
+  const file = sessionMetaPath(sessionId)
+  const prev = metaWriteQueues.get(sessionId) ?? Promise.resolve()
+  const next = prev.then(() => {
+    try {
+      const existing = readSessionMetaSync(file)
+      if (existing === null) return // unreadable/corrupt — don't clobber
+      const updated = mutator(existing)
+      if (updated === null) return
+      atomicWriteJson(file, updated)
+    } catch { /* ignore write failures */ }
+  })
+  metaWriteQueues.set(sessionId, next.catch(() => {}))
+  return next
+}
+
+// ── Persisted token stats (survive Copilot's ~14-day log pruning) ─────────────
+
+interface StoredTokenStats {
+  peakTokens: number
+  peakUtilisation: number
+  contextWindow?: number
+  initialTokens?: number
+  initialUtilisation?: number
+  compactions?: number
+}
+
+// Read a previously-persisted token snapshot from a session's gridwatch.json object.
+function parseStoredTokenStats(meta: Record<string, unknown>): StoredTokenStats | null {
+  const t = meta.tokenStats
+  if (!t || typeof t !== 'object') return null
+  const o = t as Record<string, unknown>
+  if (typeof o.peakTokens !== 'number' || o.peakTokens <= 0) return null
+  return {
+    peakTokens: o.peakTokens,
+    peakUtilisation: typeof o.peakUtilisation === 'number' ? o.peakUtilisation : 0,
+    contextWindow: typeof o.contextWindow === 'number' ? o.contextWindow : undefined,
+    initialTokens: typeof o.initialTokens === 'number' ? o.initialTokens : undefined,
+    initialUtilisation: typeof o.initialUtilisation === 'number' ? o.initialUtilisation : undefined,
+    compactions: typeof o.compactions === 'number' ? o.compactions : undefined,
+  }
+}
+
+// Persist a token snapshot, but only when the numbers actually changed (avoids churn).
+// capturedAt therefore means "when these values last changed".
+function persistTokenStats(sessionId: string, stats: StoredTokenStats): void {
+  void mutateSessionMeta(sessionId, (meta) => {
+    const prev = meta.tokenStats as Record<string, unknown> | undefined
+    if (prev
+      && prev.peakTokens === stats.peakTokens
+      && prev.peakUtilisation === stats.peakUtilisation
+      && prev.contextWindow === stats.contextWindow
+      && prev.initialTokens === stats.initialTokens
+      && prev.initialUtilisation === stats.initialUtilisation
+      && prev.compactions === stats.compactions) {
+      return null // unchanged — skip write
+    }
+    return { ...meta, tokenStats: { ...stats, capturedAt: new Date().toISOString() } }
+  })
+}
+
+const TOKEN_SNAPSHOT_LIMIT = 20 // mirror SessionsPage PAGE_SIZE — only snapshot the first page
+
 // ── IPC: sessions:get-all ─────────────────────────────────────────────────────
 
-function parseTokenLine(line: string): { tokens: number; utilisation: number } | null {
+function parseTokenLine(line: string): { tokens: number; utilisation: number; window: number } | null {
   // CompactionProcessor: Utilization 24.4% (31211/128000 tokens) below threshold 80%
   const m = line.match(/Utiliz[ae]tion\s+([\d.]+)%\s+\((\d+)\/(\d+)\s+tokens\)/)
   if (!m) return null
   return {
     utilisation: parseFloat(m[1]),
     tokens: parseInt(m[2], 10),
+    window: parseInt(m[3], 10),
   }
 }
 
-function readLogTokenHistory(
-  logDir: string,
-  createdAt: string,
-): { tokenHistory: TokenDataPoint[]; peakTokens: number; peakUtilisation: number; compactions: CompactionEvent[] } {
-  const empty = { tokenHistory: [], peakTokens: 0, peakUtilisation: 0, compactions: [] }
+interface SessionTokenData {
+  tokenHistory: TokenDataPoint[]
+  peakTokens: number
+  peakUtilisation: number
+  compactions: CompactionEvent[]
+  contextWindow: number
+}
+
+interface TokenIndex {
+  index: Map<string, SessionTokenData>
+  oldestLogTs: number | null
+  logsAvailable: boolean
+}
+
+const SESSION_ID_RE = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+
+// Build a reliable session-id -> token-usage index from Copilot's process logs.
+//
+// Each `process-<ms>-<pid>.log` records `Registering foreground session: <uuid>` /
+// `Unregistering foreground session: <uuid>` lines. The utilisation/compaction lines
+// themselves carry no session id, so they are attributed to whichever foreground session
+// is currently registered. Lines that cannot be attributed (no active session) are skipped
+// rather than guessed. This replaces the previous "closest log by timestamp" heuristic,
+// which silently bound sessions to unrelated logs once Copilot pruned the originals.
+function buildTokenIndex(logDir: string): TokenIndex {
+  const index = new Map<string, SessionTokenData>()
+  let oldestLogTs: number | null = null
   try {
-    const sessionTime = new Date(createdAt).getTime()
+    if (!fs.existsSync(logDir)) return { index, oldestLogTs, logsAvailable: false }
     const files = fs.readdirSync(logDir).filter((f) => f.startsWith('process-') && f.endsWith('.log'))
-    if (files.length === 0) return empty
+    if (files.length === 0) return { index, oldestLogTs, logsAvailable: false }
 
-    // Find log file whose timestamp is closest to session createdAt
-    let bestFile = ''
-    let bestDiff = Infinity
-    for (const f of files) {
-      const m = f.match(/process-(\d+)-\d+\.log/)
-      if (!m) continue
-      const ts = parseInt(m[1], 10)
-      const diff = Math.abs(ts - sessionTime)
-      if (diff < bestDiff) {
-        bestDiff = diff
-        bestFile = f
-      }
+    const regRe = new RegExp(`Registering foreground session: (${SESSION_ID_RE})`)
+    const unregRe = new RegExp(`Unregistering foreground session: (${SESSION_ID_RE})`)
+
+    // Process logs in chronological order so multi-log sessions accumulate in order.
+    const ordered = files
+      .map((f) => { const m = f.match(/process-(\d+)-\d+\.log/); return m ? { f, ts: parseInt(m[1], 10) } : null })
+      .filter((x): x is { f: string; ts: number } => x !== null)
+      .sort((a, b) => a.ts - b.ts)
+
+    const getEntry = (sid: string): SessionTokenData => {
+      let e = index.get(sid)
+      if (!e) { e = { tokenHistory: [], peakTokens: 0, peakUtilisation: 0, compactions: [], contextWindow: 0 }; index.set(sid, e) }
+      return e
     }
-    if (!bestFile) return empty
 
-    const content = fs.readFileSync(path.join(logDir, bestFile), 'utf-8')
-    const lines = content.split('\n')
-    const tokenHistory: TokenDataPoint[] = []
-    let peakTokens = 0
-    let peakUtilisation = 0
+    for (const { f, ts } of ordered) {
+      if (oldestLogTs === null || ts < oldestLogTs) oldestLogTs = ts
+      let content: string
+      try { content = fs.readFileSync(path.join(logDir, f), 'utf-8') } catch { continue }
 
-    // Compaction tracking
-    const compactions: CompactionEvent[] = []
-    let pendingCompaction: { timestamp: string; triggerUtilisation: number; forced: boolean; summary?: string } | null = null
+      let current: string | null = null
+      const pending = new Map<string, { timestamp: string; triggerUtilisation: number; forced: boolean; summary?: string }>()
 
-    for (const line of lines) {
-      if (!line.includes('CompactionProcessor') && !line.includes('Utiliz') && !line.includes('Persisted checkpoint')) continue
-      const tsMatch = line.match(/\[?([\d]{4}-[\d]{2}-[\d]{2}T[\d:\.]+Z)\]?/)
-      const timestamp = tsMatch ? tsMatch[1] : new Date().toISOString()
+      for (const line of content.split('\n')) {
+        const reg = regRe.exec(line)
+        if (reg) { current = reg[1]; continue }
+        const unreg = unregRe.exec(line)
+        if (unreg) { if (current === unreg[1]) current = null; continue }
 
-      // Token utilisation line
-      const parsed = parseTokenLine(line)
-      if (parsed) {
-        tokenHistory.push({ timestamp, tokens: parsed.tokens, utilisation: parsed.utilisation })
-        if (parsed.tokens > peakTokens) peakTokens = parsed.tokens
-        if (parsed.utilisation > peakUtilisation) peakUtilisation = parsed.utilisation
-        continue
-      }
+        if (!line.includes('CompactionProcessor') && !line.includes('Utiliz') && !line.includes('Persisted checkpoint')) continue
+        if (!current) continue // unattributable — skip rather than guess
 
-      // Compaction started
-      const startMatch = line.match(/Context at ([\d.]+)% utilization(\s*\(forced\))?\s*-\s*starting background compaction/)
-      if (startMatch) {
-        pendingCompaction = {
-          timestamp,
-          triggerUtilisation: parseFloat(startMatch[1]),
-          forced: !!startMatch[2],
+        const tsMatch = line.match(/\[?([\d]{4}-[\d]{2}-[\d]{2}T[\d:.]+Z)\]?/)
+        const timestamp = tsMatch ? tsMatch[1] : new Date(ts).toISOString()
+        const entry = getEntry(current)
+
+        // Token utilisation line
+        const parsed = parseTokenLine(line)
+        if (parsed) {
+          entry.tokenHistory.push({ timestamp, tokens: parsed.tokens, utilisation: parsed.utilisation })
+          // Anchor "peak" on the line with the most tokens so peakTokens, peakUtilisation and
+          // contextWindow all describe one coherent moment. The window can change across
+          // compactions (e.g. 168k → 200k), so tracking them independently produced an
+          // inconsistent snapshot (e.g. tokens/window implying a different % than stored).
+          if (parsed.tokens > entry.peakTokens) {
+            entry.peakTokens = parsed.tokens
+            entry.peakUtilisation = parsed.utilisation
+            entry.contextWindow = parsed.window
+          }
+          continue
         }
-        continue
+
+        // Compaction started
+        const startMatch = line.match(/Context at ([\d.]+)% utilization(\s*\(forced\))?\s*-\s*starting background compaction/)
+        if (startMatch) {
+          pending.set(current, { timestamp, triggerUtilisation: parseFloat(startMatch[1]), forced: !!startMatch[2] })
+          continue
+        }
+
+        // Persisted checkpoint summary (between compaction start and complete)
+        const checkpointMatch = line.match(/Persisted checkpoint #\d+:\s*(.+)/)
+        const pend = pending.get(current)
+        if (checkpointMatch && pend) { pend.summary = checkpointMatch[1].trim(); continue }
+
+        // Compaction completed with details
+        const completeMatch = line.match(/Compaction complete - replaced (\d+) messages with summary \+ (\d+) new messages, saved ~(\d+) tokens/)
+        if (completeMatch) {
+          entry.compactions.push({
+            timestamp: pend?.timestamp ?? timestamp,
+            triggerUtilisation: pend?.triggerUtilisation ?? 0,
+            forced: pend?.forced ?? false,
+            messagesReplaced: parseInt(completeMatch[1], 10),
+            newMessages: parseInt(completeMatch[2], 10),
+            tokensSaved: parseInt(completeMatch[3], 10),
+            summary: pend?.summary,
+          })
+          pending.delete(current)
+          continue
+        }
       }
 
-      // Persisted checkpoint summary (appears between compaction start and complete)
-      const checkpointMatch = line.match(/Persisted checkpoint #\d+:\s*(.+)/)
-      if (checkpointMatch && pendingCompaction) {
-        pendingCompaction.summary = checkpointMatch[1].trim()
-        continue
-      }
-
-      // Compaction completed with details
-      const completeMatch = line.match(/Compaction complete - replaced (\d+) messages with summary \+ (\d+) new messages, saved ~(\d+) tokens/)
-      if (completeMatch) {
-        compactions.push({
-          timestamp: pendingCompaction?.timestamp ?? timestamp,
-          triggerUtilisation: pendingCompaction?.triggerUtilisation ?? 0,
-          forced: pendingCompaction?.forced ?? false,
-          messagesReplaced: parseInt(completeMatch[1], 10),
-          newMessages: parseInt(completeMatch[2], 10),
-          tokensSaved: parseInt(completeMatch[3], 10),
-          summary: pendingCompaction?.summary,
+      // Flush any unmatched compaction starts (interrupted) to their session
+      for (const [sid, p] of pending) {
+        getEntry(sid).compactions.push({
+          timestamp: p.timestamp,
+          triggerUtilisation: p.triggerUtilisation,
+          forced: p.forced,
+          summary: p.summary,
         })
-        pendingCompaction = null
-        continue
-      }
-
-      // Background compaction completed (no details) — flush pending
-      if (line.includes('Background compaction completed successfully') && pendingCompaction) {
-        // Don't flush yet — wait for the "Compaction complete" detail line
       }
     }
 
-    // Flush any unmatched start (compaction interrupted)
-    if (pendingCompaction) {
-      compactions.push({
-        timestamp: pendingCompaction.timestamp,
-        triggerUtilisation: pendingCompaction.triggerUtilisation,
-        forced: pendingCompaction.forced,
-        summary: pendingCompaction.summary,
-      })
+    // Chronological order within each session (ISO timestamps sort lexicographically).
+    for (const entry of index.values()) {
+      entry.tokenHistory.sort((a, b) => a.timestamp.localeCompare(b.timestamp))
     }
 
-    return { tokenHistory, peakTokens, peakUtilisation, compactions }
+    return { index, oldestLogTs, logsAvailable: true }
   } catch {
-    return empty
+    return { index, oldestLogTs, logsAvailable: false }
   }
 }
 
@@ -305,6 +432,9 @@ async function loadAllSessions(): Promise<SessionData[]> {
     const entries = fs.readdirSync(sessionStateDir, { withFileTypes: true })
       .filter((e) => e.isDirectory())
       .map((e) => e.name)
+
+    // Build the session-id -> token-usage index once from the process logs.
+    const tokenIndex = buildTokenIndex(logDir)
 
     // Parse all sessions in parallel for faster I/O
     const sessionPromises = entries.map((entry) => new Promise<SessionData | null>((resolve) => {
@@ -428,10 +558,56 @@ async function loadAllSessions(): Promise<SessionData[]> {
           updatedAt = evtsMtime.toISOString()
         }
 
-        // Token history from log
-        const { tokenHistory, peakTokens, peakUtilisation, compactions } = fs.existsSync(logDir)
-          ? readLogTokenHistory(logDir, createdAt)
-          : { tokenHistory: [], peakTokens: 0, peakUtilisation: 0, compactions: [] }
+        // Token usage: tier 1 = live log (source of truth); tier 2 = persisted snapshot
+        // from gridwatch.json (survives Copilot's ~14-day log pruning); tier 3 = none.
+        const sessionId: string = workspace.id || entry
+        const sessionMeta = readSessionMetaSync(path.join(sessionDir, 'gridwatch.json')) ?? {}
+        const tokenData = tokenIndex.index.get(sessionId)
+        const storedStats = tokenData ? null : parseStoredTokenStats(sessionMeta)
+
+        let tokenHistory: TokenDataPoint[]
+        let peakTokens: number
+        let peakUtilisation: number
+        let compactions: CompactionEvent[]
+        let contextWindow: number | undefined
+        let initialTokens: number | undefined
+        let initialUtilisation: number | undefined
+        let tokenStatsCached = false
+
+        if (tokenData) {
+          // Tier 1: live log
+          tokenHistory = tokenData.tokenHistory
+          peakTokens = tokenData.peakTokens
+          peakUtilisation = tokenData.peakUtilisation
+          compactions = tokenData.compactions
+          contextWindow = tokenData.contextWindow || undefined
+          initialTokens = tokenData.tokenHistory[0]?.tokens
+          initialUtilisation = tokenData.tokenHistory[0]?.utilisation
+        } else if (storedStats) {
+          // Tier 2: persisted snapshot (summary only — no per-sample history)
+          tokenHistory = []
+          peakTokens = storedStats.peakTokens
+          peakUtilisation = storedStats.peakUtilisation
+          compactions = []
+          contextWindow = storedStats.contextWindow
+          initialTokens = storedStats.initialTokens
+          initialUtilisation = storedStats.initialUtilisation
+          tokenStatsCached = true
+        } else {
+          tokenHistory = []
+          peakTokens = 0
+          peakUtilisation = 0
+          compactions = []
+        }
+
+        // High-confidence "pruned" detection: logs exist, this session has neither a live
+        // log nor a saved snapshot, and it predates the oldest surviving log (~2-week rotation).
+        const tokenLogPruned = !tokenData
+          && !storedStats
+          && tokenIndex.logsAvailable
+          && tokenIndex.oldestLogTs !== null
+          && new Date(createdAt).getTime() < tokenIndex.oldestLogTs
+
 
         // Attach checkpoint markdown content to compaction events
         const checkpointsDir = path.join(sessionDir, 'checkpoints')
@@ -486,30 +662,17 @@ async function loadAllSessions(): Promise<SessionData[]> {
           copilotVersion,
           lastUserMessage,
           userMessages,
-          tags: (() => {
-            try {
-              const meta = path.join(sessionDir, 'gridwatch.json')
-              if (fs.existsSync(meta)) {
-                const d = JSON.parse(fs.readFileSync(meta, 'utf-8'))
-                return Array.isArray(d.tags) ? d.tags : []
-              }
-            } catch { /* ignore */ }
-            return []
-          })(),
-          notes: (() => {
-            try {
-              const meta = path.join(sessionDir, 'gridwatch.json')
-              if (fs.existsSync(meta)) {
-                const d = JSON.parse(fs.readFileSync(meta, 'utf-8'))
-                return typeof d.notes === 'string' ? d.notes : ''
-              }
-            } catch { /* ignore */ }
-            return ''
-          })(),
+          tags: Array.isArray(sessionMeta.tags) ? (sessionMeta.tags as string[]) : [],
+          notes: typeof sessionMeta.notes === 'string' ? sessionMeta.notes : '',
           rewindSnapshots,
           filesModified,
           peakTokens,
           peakUtilisation,
+          contextWindow,
+          initialTokens,
+          initialUtilisation,
+          tokenLogPruned,
+          tokenStatsCached,
           tokenHistory,
           compactions,
           isResearch,
@@ -550,6 +713,24 @@ async function loadAllSessions(): Promise<SessionData[]> {
     }
 
     sessions.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+
+    // Persist token snapshots for the first page (most-recently-updated) sessions that have
+    // live log data, so the numbers survive Copilot's log pruning. Writes are skipped when
+    // unchanged, serialised per session, and atomic — see persistTokenStats.
+    for (let i = 0; i < Math.min(TOKEN_SNAPSHOT_LIMIT, sessions.length); i++) {
+      const s = sessions[i]
+      const live = tokenIndex.index.get(s.id)
+      if (!live || live.tokenHistory.length === 0) continue
+      persistTokenStats(s.id, {
+        peakTokens: live.peakTokens,
+        peakUtilisation: live.peakUtilisation,
+        contextWindow: live.contextWindow || undefined,
+        initialTokens: live.tokenHistory[0]?.tokens,
+        initialUtilisation: live.tokenHistory[0]?.utilisation,
+        compactions: live.compactions.length,
+      })
+    }
+
     sessionsCache = { data: sessions, timestamp: Date.now() }
     return sessions
   } catch {
@@ -583,6 +764,11 @@ function toSummary(s: SessionData): SessionSummary {
     notes: s.notes,
     peakTokens: s.peakTokens,
     peakUtilisation: s.peakUtilisation,
+    contextWindow: s.contextWindow,
+    initialTokens: s.initialTokens,
+    initialUtilisation: s.initialUtilisation,
+    tokenLogPruned: s.tokenLogPruned,
+    tokenStatsCached: s.tokenStatsCached,
     isResearch: s.isResearch,
     isReview: s.isReview,
     agentTypes: s.agentTypes,
@@ -788,12 +974,7 @@ ipcMain.handle('sessions:set-tags', async (_e, sessionId: string, tags: string[]
     if (!isValidSessionId(sessionId)) return false
     const sessionDir = path.join(os.homedir(), '.copilot', 'session-state', sessionId)
     if (!fs.existsSync(sessionDir)) return false
-    const metaFile = path.join(sessionDir, 'gridwatch.json')
-    let existing: Record<string, unknown> = {}
-    if (fs.existsSync(metaFile)) {
-      try { existing = JSON.parse(fs.readFileSync(metaFile, 'utf-8')) } catch { /* ignore */ }
-    }
-    fs.writeFileSync(metaFile, JSON.stringify({ ...existing, tags }, null, 2), 'utf-8')
+    await mutateSessionMeta(sessionId, (meta) => ({ ...meta, tags }))
     return true
   } catch {
     return false
@@ -809,12 +990,7 @@ ipcMain.handle('sessions:set-notes', async (_e, sessionId: string, notes: string
     const safeNotes = typeof notes === 'string' ? notes.slice(0, 100_000) : ''
     const sessionDir = path.join(os.homedir(), '.copilot', 'session-state', sessionId)
     if (!fs.existsSync(sessionDir)) return false
-    const metaFile = path.join(sessionDir, 'gridwatch.json')
-    let existing: Record<string, unknown> = {}
-    if (fs.existsSync(metaFile)) {
-      try { existing = JSON.parse(fs.readFileSync(metaFile, 'utf-8')) } catch { /* ignore */ }
-    }
-    fs.writeFileSync(metaFile, JSON.stringify({ ...existing, notes: safeNotes }, null, 2), 'utf-8')
+    await mutateSessionMeta(sessionId, (meta) => ({ ...meta, notes: safeNotes }))
     return true
   } catch {
     return false
