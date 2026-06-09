@@ -13,6 +13,14 @@ import type { McpServerData, McpEnvVar, McpTool } from '../src/types/mcp'
 import type { LspServerData } from '../src/types/lsp'
 import type { AllowedDirectory } from '../src/types/dirs'
 import type { AutoTagRule } from '../src/types/autotag'
+import type { OrchestrationConfig, OrchestrationStatus } from '../src/types/skill'
+import {
+  buildManagedBlock,
+  computeOrchestrationStatus,
+  mergeManagedBlock,
+  normaliseBlock,
+  renderOrchestratorWorkflow,
+} from '../src/lib/orchestration'
 
 // Must be set before app is ready so the OS picks it up for dock/taskbar tooltip
 app.setName('GridWatch')
@@ -1383,6 +1391,43 @@ function isValidSkillName(name: string): boolean {
   return typeof name === 'string' && name.length > 0 && name.length <= 100 && SKILL_NAME_PATTERN.test(name)
 }
 
+/** Stable hash of a normalised managed block, used to detect manual edits. */
+function hashBlock(s: string): string {
+  return createHash('sha256').update(s).digest('hex')
+}
+
+/** Validate + normalise an untrusted orchestration config from gridwatch.json. */
+function parseOrchestration(raw: unknown): OrchestrationConfig | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const o = raw as Record<string, unknown>
+  if (o.isOrchestrator !== true) return undefined
+  const mode = o.mode === 'parallel' ? 'parallel' : 'sequential'
+  const outputDir = typeof o.outputDir === 'string' ? o.outputDir : ''
+  const children: OrchestrationConfig['children'] = {}
+  if (o.children && typeof o.children === 'object') {
+    for (const [k, v] of Object.entries(o.children as Record<string, unknown>)) {
+      if (PROTOTYPE_POLLUTION_KEYS.has(k) || !v || typeof v !== 'object') continue
+      const c = v as Record<string, unknown>
+      children[k] = {
+        inputDir: typeof c.inputDir === 'string' ? c.inputDir : '',
+        outputDir: typeof c.outputDir === 'string' ? c.outputDir : '',
+        outputFile: typeof c.outputFile === 'string' ? c.outputFile : '',
+      }
+    }
+  }
+  return {
+    isOrchestrator: true,
+    mode,
+    outputDir,
+    runIdSource: typeof o.runIdSource === 'string' ? o.runIdSource : 'session',
+    children,
+    finalOutput: typeof o.finalOutput === 'string' ? o.finalOutput : undefined,
+    schemaVersion: typeof o.schemaVersion === 'number' ? o.schemaVersion : 1,
+    generatedHash: typeof o.generatedHash === 'string' ? o.generatedHash : undefined,
+    generatedAt: typeof o.generatedAt === 'string' ? o.generatedAt : undefined,
+  }
+}
+
 function parseSkillFrontmatter(raw: string): { displayName: string; description: string; license: string | undefined } {
   const result: { displayName: string; description: string; license: string | undefined } = { displayName: '', description: '', license: undefined }
   const match = raw.match(/^---\s*\n([\s\S]*?)\n---/)
@@ -1427,6 +1472,7 @@ function scanSkillDir(dirPath: string, enabled: boolean): SkillData | null {
   let tags: string[] = []
   let childSkills: string[] = []
   let linkedAgents: string[] = []
+  let orchestration: OrchestrationConfig | undefined
   try {
     const metaFile = path.join(dirPath, 'gridwatch.json')
     if (fs.existsSync(metaFile)) {
@@ -1434,8 +1480,20 @@ function scanSkillDir(dirPath: string, enabled: boolean): SkillData | null {
       if (Array.isArray(meta.tags)) tags = meta.tags
       if (Array.isArray(meta.childSkills)) childSkills = meta.childSkills.filter((s: unknown): s is string => typeof s === 'string')
       if (Array.isArray(meta.linkedAgents)) linkedAgents = meta.linkedAgents.filter((s: unknown): s is string => typeof s === 'string')
+      orchestration = parseOrchestration(meta.orchestration)
     }
   } catch { /* ignore */ }
+
+  // Compute the relationship between the stored config and the SKILL.md managed block.
+  let orchestrationStatus: OrchestrationStatus = 'none'
+  if (orchestration?.isOrchestrator) {
+    try {
+      const raw = fs.readFileSync(skillMdPath, 'utf-8')
+      orchestrationStatus = computeOrchestrationStatus(raw, orchestration.generatedHash, hashBlock)
+    } catch {
+      orchestrationStatus = 'missing'
+    }
+  }
 
   // Estimate token count from total text content (~4 chars per token)
   let totalChars = 0
@@ -1459,6 +1517,8 @@ function scanSkillDir(dirPath: string, enabled: boolean): SkillData | null {
     childSkills,
     linkedAgents,
     estimatedTokens,
+    orchestration,
+    orchestrationStatus,
   }
 }
 
@@ -1698,6 +1758,126 @@ ipcMain.handle('skills:set-relations', async (_e, skillName: string, childSkills
     return true
   } catch {
     return false
+  }
+})
+
+// Locate a skill directory across enabled/disabled bases.
+function findSkillDir(skillName: string): string | null {
+  const enabledDir = path.join(os.homedir(), '.copilot', 'skills', skillName)
+  const disabledDir = path.join(os.homedir(), '.copilot', 'skills-disabled', skillName)
+  return fs.existsSync(enabledDir) ? enabledDir : fs.existsSync(disabledDir) ? disabledDir : null
+}
+
+ipcMain.handle('skills:set-orchestration', async (_e, skillName: string, config: unknown): Promise<boolean> => {
+  try {
+    if (!isValidSkillName(skillName)) return false
+    const skillDir = findSkillDir(skillName)
+    if (!skillDir) return false
+
+    const incoming = parseOrchestration(
+      config && typeof config === 'object' ? { ...(config as object), isOrchestrator: true } : undefined,
+    )
+    if (!incoming) return false
+
+    const metaFile = path.join(skillDir, 'gridwatch.json')
+    let existing: Record<string, unknown> = {}
+    if (fs.existsSync(metaFile)) {
+      try { existing = JSON.parse(fs.readFileSync(metaFile, 'utf-8')) } catch { /* ignore */ }
+    }
+    // Preserve provenance (generatedHash/At) — those are owned by the generate step, not the client.
+    const prev = parseOrchestration(existing.orchestration)
+    const merged: OrchestrationConfig = {
+      ...incoming,
+      generatedHash: prev?.generatedHash,
+      generatedAt: prev?.generatedAt,
+    }
+    fs.writeFileSync(metaFile, JSON.stringify({ ...existing, orchestration: merged }, null, 2), 'utf-8')
+    return true
+  } catch {
+    return false
+  }
+})
+
+ipcMain.handle('skills:preview-orchestrator', async (_e, skillName: string): Promise<{ ok: boolean; block?: string; error?: string }> => {
+  try {
+    if (!isValidSkillName(skillName)) return { ok: false, error: 'Invalid skill name' }
+    const skillDir = findSkillDir(skillName)
+    if (!skillDir) return { ok: false, error: 'Skill not found' }
+    const metaFile = path.join(skillDir, 'gridwatch.json')
+    if (!fs.existsSync(metaFile)) return { ok: false, error: 'No orchestration config' }
+    const meta = JSON.parse(fs.readFileSync(metaFile, 'utf-8'))
+    const config = parseOrchestration(meta.orchestration)
+    if (!config) return { ok: false, error: 'Not an orchestrator' }
+    const order: string[] = Array.isArray(meta.childSkills)
+      ? meta.childSkills.filter((s: unknown): s is string => typeof s === 'string')
+      : []
+    const frontmatter = parseSkillFrontmatter(fs.readFileSync(path.join(skillDir, 'SKILL.md'), 'utf-8'))
+    const inner = renderOrchestratorWorkflow(frontmatter.displayName || skillName, skillName, config, order)
+    return { ok: true, block: buildManagedBlock(inner) }
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('skills:generate-orchestrator', async (_e, skillName: string): Promise<{ ok: boolean; status?: OrchestrationStatus; error?: string }> => {
+  try {
+    if (!isValidSkillName(skillName)) return { ok: false, error: 'Invalid skill name' }
+    const skillDir = findSkillDir(skillName)
+    if (!skillDir) return { ok: false, error: 'Skill not found' }
+    const metaFile = path.join(skillDir, 'gridwatch.json')
+    if (!fs.existsSync(metaFile)) return { ok: false, error: 'No orchestration config' }
+    const meta = JSON.parse(fs.readFileSync(metaFile, 'utf-8'))
+    const config = parseOrchestration(meta.orchestration)
+    if (!config) return { ok: false, error: 'Not an orchestrator' }
+    const order: string[] = Array.isArray(meta.childSkills)
+      ? meta.childSkills.filter((s: unknown): s is string => typeof s === 'string')
+      : []
+
+    const skillMdPath = path.join(skillDir, 'SKILL.md')
+    if (!isPathWithin(skillMdPath, skillDir)) return { ok: false, error: 'Invalid path' }
+    const existingMd = fs.existsSync(skillMdPath) ? fs.readFileSync(skillMdPath, 'utf-8') : ''
+    const frontmatter = parseSkillFrontmatter(existingMd)
+    const inner = renderOrchestratorWorkflow(frontmatter.displayName || skillName, skillName, config, order)
+    const block = buildManagedBlock(inner)
+
+    const merged = mergeManagedBlock(existingMd || `---\nname: ${skillName}\ndescription: Orchestrator skill\n---\n\n# ${skillName}\n`, block)
+    if (!merged.ok) return { ok: false, status: 'broken', error: merged.reason }
+
+    // Back up before writing so a bad regenerate is recoverable.
+    if (existingMd) {
+      try { fs.writeFileSync(`${skillMdPath}.bak`, existingMd, 'utf-8') } catch { /* non-fatal */ }
+    }
+    fs.writeFileSync(skillMdPath, merged.text, 'utf-8')
+
+    // Persist provenance so we can later detect manual edits.
+    const generatedHash = hashBlock(normaliseBlock(inner))
+    const nextConfig: OrchestrationConfig = {
+      ...config,
+      generatedHash,
+      generatedAt: new Date().toISOString(),
+    }
+    fs.writeFileSync(metaFile, JSON.stringify({ ...meta, orchestration: nextConfig }, null, 2), 'utf-8')
+    return { ok: true, status: 'in-sync' }
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+})
+
+ipcMain.handle('app:pick-directory', async (): Promise<{ ok: boolean; path?: string; error?: string }> => {
+  if (!win) return { ok: false, error: 'No window available' }
+  try {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: 'Choose a folder',
+      properties: ['openDirectory', 'createDirectory'],
+    })
+    if (canceled || !filePaths.length) return { ok: false, error: 'Cancelled' }
+    const selected = filePaths[0]
+    if (!isValidDirPath(selected) || PROTOTYPE_POLLUTION_KEYS.has(selected)) {
+      return { ok: false, error: 'Invalid directory path' }
+    }
+    return { ok: true, path: selected }
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
   }
 })
 

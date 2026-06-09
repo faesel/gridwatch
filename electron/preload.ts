@@ -59,6 +59,13 @@ contextBridge.exposeInMainWorld('gridwatchAPI', {
     ipcRenderer.invoke('skills:set-tags', skillName, tags),
   setSkillRelations: (skillName: string, childSkills: string[], linkedAgents: string[]) =>
     ipcRenderer.invoke('skills:set-relations', skillName, childSkills, linkedAgents),
+  setSkillOrchestration: (skillName: string, config: unknown) =>
+    ipcRenderer.invoke('skills:set-orchestration', skillName, config),
+  previewOrchestrator: (skillName: string) =>
+    ipcRenderer.invoke('skills:preview-orchestrator', skillName),
+  generateOrchestrator: (skillName: string) =>
+    ipcRenderer.invoke('skills:generate-orchestrator', skillName),
+  pickDirectory: () => ipcRenderer.invoke('app:pick-directory'),
 
   // MCP
   getMcpServers: () => ipcRenderer.invoke('mcp:get-servers'),

@@ -1,0 +1,25 @@
+{
+  "tags": ["example"],
+  "childSkills": ["append-x", "append-y"],
+  "linkedAgents": [],
+  "orchestration": {
+    "isOrchestrator": true,
+    "mode": "sequential",
+    "outputDir": "/tmp/gridwatch-demo",
+    "runIdSource": "session",
+    "children": {
+      "append-x": {
+        "inputDir": "",
+        "outputDir": "/tmp/gridwatch-demo",
+        "outputFile": "letters-<SESSION_ID>.txt"
+      },
+      "append-y": {
+        "inputDir": "/tmp/gridwatch-demo",
+        "outputDir": "/tmp/gridwatch-demo",
+        "outputFile": "letters-<SESSION_ID>.txt"
+      }
+    },
+    "finalOutput": "",
+    "schemaVersion": 1
+  }
+}

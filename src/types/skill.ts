@@ -5,6 +5,29 @@ export interface SkillFile {
   modifiedAt: string;
 }
 
+export type OrchestrationMode = 'sequential' | 'parallel';
+
+export interface OrchestrationChild {
+  inputDir?: string;
+  outputDir?: string;
+  outputFile?: string;
+}
+
+export interface OrchestrationConfig {
+  isOrchestrator: boolean;
+  mode: OrchestrationMode;
+  outputDir: string;
+  runIdSource?: string;
+  children: Record<string, OrchestrationChild>;
+  finalOutput?: string;
+  schemaVersion?: number;
+  generatedHash?: string;
+  generatedAt?: string;
+}
+
+/** Status of the generated managed block within an orchestrator's SKILL.md. */
+export type OrchestrationStatus = 'none' | 'missing' | 'in-sync' | 'edited' | 'broken';
+
 export interface SkillData {
   name: string;
   displayName: string;
@@ -20,4 +43,7 @@ export interface SkillData {
   childSkills: string[];
   linkedAgents: string[];
   estimatedTokens: number;
+  orchestration?: OrchestrationConfig;
+  /** Computed at load: relationship between the config and the SKILL.md managed block. */
+  orchestrationStatus?: OrchestrationStatus;
 }

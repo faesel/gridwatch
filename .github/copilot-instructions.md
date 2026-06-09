@@ -44,7 +44,7 @@ Renderer (src/)
 | File | Contents |
 |---|---|
 | `~/.copilot/session-state/<uuid>/gridwatch.json` | `{ "tags": [...], "notes": "...", "tokenStats": { "peakTokens", "peakUtilisation", "contextWindow", "initialTokens", "initialUtilisation", "compactions", "capturedAt" } }` — `tokenStats` is a snapshot persisted so token numbers survive Copilot's ~14-day log pruning |
-| `~/.copilot/skills/<name>/gridwatch.json` | `{ "tags": [...], "childSkills": [...], "linkedAgents": [...] }` — skill tags, nested child-skill folder names, and linked agent ids |
+| `~/.copilot/skills/<name>/gridwatch.json` | `{ "tags": [...], "childSkills": [...], "linkedAgents": [...], "orchestration"?: {...} }` — skill tags, nested child-skill folder names, linked agent ids, and (for orchestrators) the orchestration config: `{ isOrchestrator, mode: 'sequential'\|'parallel', outputDir, children: { <name>: { inputDir, outputDir, outputFile } }, finalOutput?, generatedHash, generatedAt }` |
 | `~/.copilot/skills-disabled/<name>/` | Skills moved here when disabled via GridWatch toggle |
 | `~/.copilot/gridwatch-mcp-tools-cache.json` | Disk-persisted cache of MCP tool lists queried via JSON-RPC `tools/list` |
 | `~/.copilot/gridwatch-lsp-disabled.json` | LSP servers moved here when disabled via GridWatch toggle |
@@ -125,6 +125,12 @@ gridwatch/
 | `importSkill()` | `skills:import` | Opens file/folder dialog, copies into `skills/` |
 | `setSkillTags(name, tags[])` | `skills:set-tags` | Writes/merges tags into skill's `gridwatch.json` |
 | `setSkillRelations(name, childSkills[], linkedAgents[])` | `skills:set-relations` | Writes/merges child-skill and linked-agent relationships into skill's `gridwatch.json`. Validates that children/agents exist and rejects self-reference |
+| `setSkillOrchestration(name, config)` | `skills:set-orchestration` | Writes/merges the `orchestration` block into the parent skill's `gridwatch.json`. Preserves provenance (`generatedHash`/`generatedAt`), which are owned by the generate step |
+| `previewOrchestrator(name)` | `skills:preview-orchestrator` | Renders the managed workflow block from the saved config + `childSkills` order without writing — returns `{ ok, block?, error? }` |
+| `generateOrchestrator(name)` | `skills:generate-orchestrator` | Renders and merges the managed block into the orchestrator's own `SKILL.md` (backs up to `SKILL.md.bak`), stores `generatedHash`. Refuses and returns `status:'broken'` if the managed markers are damaged |
+| `pickDirectory()` | `app:pick-directory` | Opens a native folder picker, returns `{ ok, path? }` |
+
+**Orchestrator skills:** A parent skill can be flagged an orchestrator that invokes its attached child skills (run order = `childSkills` order). The generated workflow lives in a GridWatch-managed block in the parent's `SKILL.md`, anchored by `<!-- gridwatch:orchestration:start -->` / `:end -->` markers wrapped in DO-NOT-EDIT banner comments; only that region is rewritten on regenerate, so prose outside it survives. `mode` is `'sequential'` (one-by-one) or `'parallel'` (all as background tasks). Per-child input/output folders are auto-wired on attach (`child.inputDir = previous child's outputDir`) and overridable. Status (`in-sync`/`edited`/`broken`/`missing`) is computed in `main.ts` during scan by hashing the normalised managed block against the stored `generatedHash`. v1 surfaces a status indicator only — no auto-repair. The editable graph (VIEW/EDIT toggle) lives in `SkillGraphPage.tsx`; pure rendering/merge/status logic is in `src/lib/orchestration.ts` (shared by main + renderer).
 
 **Skill name validation:** lowercase alphanumeric and hyphens only (`/^[a-z0-9][a-z0-9-]*$/`).
 

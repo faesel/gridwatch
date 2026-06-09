@@ -1,5 +1,5 @@
 import type { SessionData, SessionSummary, SessionDetail } from './session';
-import type { SkillData } from './skill';
+import type { SkillData, OrchestrationConfig, OrchestrationStatus } from './skill';
 import type { McpServerData } from './mcp';
 import type { CustomAgentData } from './agent';
 import type { LspServerData } from './lsp';
@@ -64,6 +64,10 @@ declare global {
       importSkill: () => Promise<{ ok: boolean; name?: string; error?: string }>;
       setSkillTags: (skillName: string, tags: string[]) => Promise<boolean>;
       setSkillRelations: (skillName: string, childSkills: string[], linkedAgents: string[]) => Promise<boolean>;
+      setSkillOrchestration: (skillName: string, config: OrchestrationConfig) => Promise<boolean>;
+      previewOrchestrator: (skillName: string) => Promise<{ ok: boolean; block?: string; error?: string }>;
+      generateOrchestrator: (skillName: string) => Promise<{ ok: boolean; status?: OrchestrationStatus; error?: string }>;
+      pickDirectory: () => Promise<{ ok: boolean; path?: string; error?: string }>;
 
       // MCP
       getMcpServers: () => Promise<McpServerData[]>;
