@@ -140,7 +140,9 @@ const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/
 
 // ── IPC response cache ────────────────────────────────────────────────────────
 let sessionsCache: { data: SessionData[]; timestamp: number } | null = null
-const CACHE_TTL = 15_000 // 15 seconds — aligned with renderer refresh
+const CACHE_TTL = 60_000 // 60 seconds — exceeds the renderer's 30s auto-refresh so the
+                         // periodic refresh is served from memory; user mutations (rename,
+                         // archive, delete, tags, notes, orchestration) invalidate it eagerly.
 
 let logTokensCache: { data: { date: string; tokens: number; utilisation: number }[]; timestamp: number } | null = null
 const LOG_TOKENS_CACHE_TTL = 15_000 // 15 seconds
@@ -169,6 +171,26 @@ function readSessionMetaSync(file: string): Record<string, unknown> | null {
   try {
     const d = JSON.parse(fs.readFileSync(file, 'utf-8'))
     return d && typeof d === 'object' && !Array.isArray(d) ? (d as Record<string, unknown>) : {}
+  } catch {
+    return null
+  }
+}
+
+// ── Async, non-blocking file helpers ──────────────────────────────────────────
+// The session scan touches thousands of files; using these keeps the Electron main
+// process event loop responsive (no busy cursor / window lag during a refresh).
+
+async function readTextMaybe(p: string): Promise<string | null> {
+  try {
+    return await fs.promises.readFile(p, 'utf-8')
+  } catch {
+    return null
+  }
+}
+
+async function statMtimeMaybe(p: string): Promise<Date | null> {
+  try {
+    return (await fs.promises.stat(p)).mtime
   } catch {
     return null
   }
@@ -285,12 +307,16 @@ const SESSION_ID_RE = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 // is currently registered. Lines that cannot be attributed (no active session) are skipped
 // rather than guessed. This replaces the previous "closest log by timestamp" heuristic,
 // which silently bound sessions to unrelated logs once Copilot pruned the originals.
-function buildTokenIndex(logDir: string): TokenIndex {
+async function buildTokenIndex(logDir: string): Promise<TokenIndex> {
   const index = new Map<string, SessionTokenData>()
   let oldestLogTs: number | null = null
   try {
-    if (!fs.existsSync(logDir)) return { index, oldestLogTs, logsAvailable: false }
-    const files = fs.readdirSync(logDir).filter((f) => f.startsWith('process-') && f.endsWith('.log'))
+    let files: string[]
+    try {
+      files = (await fs.promises.readdir(logDir)).filter((f) => f.startsWith('process-') && f.endsWith('.log'))
+    } catch {
+      return { index, oldestLogTs, logsAvailable: false }
+    }
     if (files.length === 0) return { index, oldestLogTs, logsAvailable: false }
 
     const regRe = new RegExp(`Registering foreground session: (${SESSION_ID_RE})`)
@@ -310,8 +336,8 @@ function buildTokenIndex(logDir: string): TokenIndex {
 
     for (const { f, ts } of ordered) {
       if (oldestLogTs === null || ts < oldestLogTs) oldestLogTs = ts
-      let content: string
-      try { content = fs.readFileSync(path.join(logDir, f), 'utf-8') } catch { continue }
+      const content = await readTextMaybe(path.join(logDir, f))
+      if (content === null) continue
 
       let current: string | null = null
       const pending = new Map<string, { timestamp: string; triggerUtilisation: number; forced: boolean; summary?: string }>()
@@ -398,31 +424,34 @@ function buildTokenIndex(logDir: string): TokenIndex {
 
 // ── Context cost estimation helpers ───────────────────────────────────────────
 
-function estimateFileTokens(filePath: string): number {
-  try {
-    if (fs.existsSync(filePath)) {
-      return Math.round(fs.readFileSync(filePath, 'utf-8').length / 4)
-    }
-  } catch { /* skip unreadable */ }
-  return 0
+async function estimateFileTokens(filePath: string): Promise<number> {
+  const content = await readTextMaybe(filePath)
+  return content === null ? 0 : Math.round(content.length / 4)
 }
 
-function buildContextCost(
+async function buildContextCost(
   projectRoot: string | undefined,
-): { items: ContextCostItem[]; totalTokens: number } {
+  cache?: Map<string, { items: ContextCostItem[]; totalTokens: number }>,
+): Promise<{ items: ContextCostItem[]; totalTokens: number }> {
+  const key = projectRoot ?? ''
+  const cached = cache?.get(key)
+  if (cached) return cached
+
   const items: ContextCostItem[] = []
 
   // Instruction files — check gitRoot (or cwd) for .github/copilot-instructions.md
   if (projectRoot) {
     const instructionPath = path.join(projectRoot, '.github', 'copilot-instructions.md')
-    const tokens = estimateFileTokens(instructionPath)
+    const tokens = await estimateFileTokens(instructionPath)
     if (tokens > 0) {
       items.push({ label: 'copilot-instructions.md', path: instructionPath, tokens })
     }
   }
 
   const totalTokens = items.reduce((sum, i) => sum + i.tokens, 0)
-  return { items, totalTokens }
+  const result = { items, totalTokens }
+  cache?.set(key, result)
+  return result
 }
 
 async function loadAllSessions(): Promise<SessionData[]> {
@@ -435,23 +464,30 @@ async function loadAllSessions(): Promise<SessionData[]> {
     const sessionStateDir = path.join(os.homedir(), '.copilot', 'session-state')
     const logDir = path.join(os.homedir(), '.copilot', 'logs')
 
-    if (!fs.existsSync(sessionStateDir)) return []
-
-    const entries = fs.readdirSync(sessionStateDir, { withFileTypes: true })
-      .filter((e) => e.isDirectory())
-      .map((e) => e.name)
+    let entries: string[]
+    try {
+      entries = (await fs.promises.readdir(sessionStateDir, { withFileTypes: true }))
+        .filter((e) => e.isDirectory())
+        .map((e) => e.name)
+    } catch {
+      return []
+    }
 
     // Build the session-id -> token-usage index once from the process logs.
-    const tokenIndex = buildTokenIndex(logDir)
+    const tokenIndex = await buildTokenIndex(logDir)
 
-    // Parse all sessions in parallel for faster I/O
-    const sessionPromises = entries.map((entry) => new Promise<SessionData | null>((resolve) => {
+    // Memoise per-project-root context-cost reads so a repo's copilot-instructions.md is
+    // read once per scan rather than once per session sharing that repo.
+    const contextCostCache = new Map<string, { items: ContextCostItem[]; totalTokens: number }>()
+
+    // Parse all sessions concurrently with non-blocking I/O so the main process stays responsive.
+    const sessionPromises = entries.map((entry) => (async (): Promise<SessionData | null> => {
       try {
         const sessionDir = path.join(sessionStateDir, entry)
         const workspaceFile = path.join(sessionDir, 'workspace.yaml')
-        if (!fs.existsSync(workspaceFile)) return resolve(null)
+        const yamlContent = await readTextMaybe(workspaceFile)
+        if (yamlContent === null) return null
 
-        const yamlContent = fs.readFileSync(workspaceFile, 'utf-8')
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let workspace: any = {}
         if (jsyaml) {
@@ -474,8 +510,8 @@ async function loadAllSessions(): Promise<SessionData[]> {
         const agentTypesUsed = new Set<string>()
 
         const eventsFile = path.join(sessionDir, 'events.jsonl')
-        if (fs.existsSync(eventsFile)) {
-          const eventsContent = fs.readFileSync(eventsFile, 'utf-8')
+        const eventsContent = await readTextMaybe(eventsFile)
+        if (eventsContent !== null) {
           const allEvents: { type: string; data?: Record<string, unknown>; timestamp?: string }[] = []
           for (const line of eventsContent.split('\n')) {
             if (line.includes('"agent_type":"code-review"')) hasCodeReviewAgent = true
@@ -522,12 +558,14 @@ async function loadAllSessions(): Promise<SessionData[]> {
           }
         }
 
-        // Rewind snapshots
+        // Rewind snapshots + files modified — read and parse the index once.
         const rewindFile = path.join(sessionDir, 'rewind-snapshots', 'index.json')
         const rewindSnapshots: RewindSnapshot[] = []
-        if (fs.existsSync(rewindFile)) {
+        const filesModified: string[] = []
+        const rewindRaw = await readTextMaybe(rewindFile)
+        if (rewindRaw !== null) {
           try {
-            const rewindData = JSON.parse(fs.readFileSync(rewindFile, 'utf-8'))
+            const rewindData = JSON.parse(rewindRaw)
             if (Array.isArray(rewindData.snapshots)) {
               for (const s of rewindData.snapshots) {
                 rewindSnapshots.push({
@@ -539,21 +577,11 @@ async function loadAllSessions(): Promise<SessionData[]> {
                 })
               }
             }
-          } catch {
-            // ignore
-          }
-        }
-
-        // Files modified (from rewind snapshots filePathMap or snapshot files)
-        const filesModified: string[] = []
-        if (fs.existsSync(rewindFile)) {
-          try {
-            const rewindData = JSON.parse(fs.readFileSync(rewindFile, 'utf-8'))
             if (rewindData.filePathMap && typeof rewindData.filePathMap === 'object') {
               filesModified.push(...Object.values<string>(rewindData.filePathMap))
             }
           } catch {
-            // ignore
+            // ignore malformed index
           }
         }
 
@@ -561,7 +589,7 @@ async function loadAllSessions(): Promise<SessionData[]> {
         let updatedAt: string = new Date(workspace.updated_at || workspace.updatedAt || createdAt).toISOString()
 
         // Use events.jsonl mtime if newer — workspace.yaml updated_at can be stale
-        const evtsMtime = fs.existsSync(eventsFile) ? fs.statSync(eventsFile).mtime : null
+        const evtsMtime = await statMtimeMaybe(eventsFile)
         if (evtsMtime && evtsMtime.getTime() > new Date(updatedAt).getTime()) {
           updatedAt = evtsMtime.toISOString()
         }
@@ -569,7 +597,18 @@ async function loadAllSessions(): Promise<SessionData[]> {
         // Token usage: tier 1 = live log (source of truth); tier 2 = persisted snapshot
         // from gridwatch.json (survives Copilot's ~14-day log pruning); tier 3 = none.
         const sessionId: string = workspace.id || entry
-        const sessionMeta = readSessionMetaSync(path.join(sessionDir, 'gridwatch.json')) ?? {}
+        const metaRaw = await readTextMaybe(path.join(sessionDir, 'gridwatch.json'))
+        let sessionMeta: Record<string, unknown> = {}
+        if (metaRaw !== null) {
+          try {
+            const parsed = JSON.parse(metaRaw)
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              sessionMeta = parsed as Record<string, unknown>
+            }
+          } catch {
+            // unreadable/corrupt — treat as empty, don't fail the session
+          }
+        }
         const tokenData = tokenIndex.index.get(sessionId)
         const storedStats = tokenData ? null : parseStoredTokenStats(sessionMeta)
 
@@ -619,19 +658,17 @@ async function loadAllSessions(): Promise<SessionData[]> {
 
         // Attach checkpoint markdown content to compaction events
         const checkpointsDir = path.join(sessionDir, 'checkpoints')
-        if (compactions.length > 0 && fs.existsSync(checkpointsDir)) {
+        if (compactions.length > 0) {
+          let cpFiles: string[] = []
           try {
-            const cpFiles = fs.readdirSync(checkpointsDir)
+            cpFiles = (await fs.promises.readdir(checkpointsDir))
               .filter(f => f.endsWith('.md') && f !== 'index.md')
               .sort()
-            for (let ci = 0; ci < compactions.length && ci < cpFiles.length; ci++) {
-              try {
-                compactions[ci].checkpointContent = fs.readFileSync(
-                  path.join(checkpointsDir, cpFiles[ci]), 'utf-8'
-                )
-              } catch { /* skip unreadable files */ }
-            }
           } catch { /* ignore missing/unreadable checkpoints dir */ }
+          for (let ci = 0; ci < compactions.length && ci < cpFiles.length; ci++) {
+            const content = await readTextMaybe(path.join(checkpointsDir, cpFiles[ci]))
+            if (content !== null) compactions[ci].checkpointContent = content
+          }
         }
 
         // Detect research sessions
@@ -641,19 +678,16 @@ async function loadAllSessions(): Promise<SessionData[]> {
         // Detect review sessions (code-review agent used)
         const isReview = hasCodeReviewAgent
 
-        const researchReports: string[] = (() => {
-            try {
-              const researchDir = path.join(sessionDir, 'research')
-              if (!fs.existsSync(researchDir)) return []
-              return fs.readdirSync(researchDir)
-                .filter((f) => f.endsWith('.md'))
-                .sort()
-                .map((f) => path.join(researchDir, f))
-            } catch { /* ignore */ }
-            return []
-          })()
+        let researchReports: string[] = []
+        try {
+          const researchDir = path.join(sessionDir, 'research')
+          researchReports = (await fs.promises.readdir(researchDir))
+            .filter((f) => f.endsWith('.md'))
+            .sort()
+            .map((f) => path.join(researchDir, f))
+        } catch { /* no research dir */ }
 
-        resolve({
+        return {
           id: workspace.id || entry,
           cwd: workspace.cwd || '',
           gitRoot: workspace.git_root || undefined,
@@ -690,14 +724,15 @@ async function loadAllSessions(): Promise<SessionData[]> {
           userMessageCount: userMessages.length,
           researchReportCount: researchReports.length,
           researchReports,
-          contextCost: buildContextCost(
+          contextCost: await buildContextCost(
             workspace.git_root || workspace.cwd || undefined,
+            contextCostCache,
           ),
-        })
+        }
       } catch {
-        resolve(null)
+        return null
       }
-    }))
+    })())
 
     const results = await Promise.all(sessionPromises)
     const sessions = results.filter((s): s is SessionData => s !== null)
