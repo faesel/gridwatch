@@ -58,6 +58,8 @@ export interface SessionSummary {
   tags: string[];
   autoTags: string[];
   notes: string;
+  /** True when the user has pinned this session to the top of the list. */
+  pinned: boolean;
   peakTokens: number;
   peakUtilisation: number;
   /** Context-window size (denominator) seen on the peak utilisation log line, if known. */

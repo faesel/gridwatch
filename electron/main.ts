@@ -706,6 +706,7 @@ async function loadAllSessions(): Promise<SessionData[]> {
           userMessages,
           tags: Array.isArray(sessionMeta.tags) ? (sessionMeta.tags as string[]) : [],
           notes: typeof sessionMeta.notes === 'string' ? sessionMeta.notes : '',
+          pinned: sessionMeta.pinned === true,
           rewindSnapshots,
           filesModified,
           peakTokens,
@@ -805,6 +806,7 @@ function toSummary(s: SessionData): SessionSummary {
     tags: s.tags,
     autoTags: s.autoTags,
     notes: s.notes,
+    pinned: s.pinned,
     peakTokens: s.peakTokens,
     peakUtilisation: s.peakUtilisation,
     contextWindow: s.contextWindow,
@@ -1034,6 +1036,21 @@ ipcMain.handle('sessions:set-notes', async (_e, sessionId: string, notes: string
     const sessionDir = path.join(os.homedir(), '.copilot', 'session-state', sessionId)
     if (!fs.existsSync(sessionDir)) return false
     await mutateSessionMeta(sessionId, (meta) => ({ ...meta, notes: safeNotes }))
+    return true
+  } catch {
+    return false
+  }
+})
+
+// ── IPC: sessions:set-pinned ──────────────────────────────────────────────────
+
+ipcMain.handle('sessions:set-pinned', async (_e, sessionId: string, pinned: boolean): Promise<boolean> => {
+  invalidateSessionsCache()
+  try {
+    if (!isValidSessionId(sessionId)) return false
+    const sessionDir = path.join(os.homedir(), '.copilot', 'session-state', sessionId)
+    if (!fs.existsSync(sessionDir)) return false
+    await mutateSessionMeta(sessionId, (meta) => ({ ...meta, pinned: pinned === true }))
     return true
   } catch {
     return false

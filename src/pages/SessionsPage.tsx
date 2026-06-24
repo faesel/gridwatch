@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
+import type { MouseEvent as ReactMouseEvent } from 'react'
 import type { SessionSummary, SessionDetail } from '../types/session'
 import TagInput from '../components/TagInput'
 import styles from './SessionsPage.module.css'
@@ -74,6 +75,9 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
   const [page, setPage] = useState(0)
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameValue, setRenameValue] = useState('')
+  // Optimistic pin overrides keyed by session id, so the icon and ordering update instantly
+  // instead of waiting for the full session rescan triggered by onSessionRenamed().
+  const [pinOverrides, setPinOverrides] = useState<Record<string, boolean>>({})
   const [confirm, setConfirm] = useState<'archive' | 'delete' | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [localTags, setLocalTags] = useState<string[]>([])
@@ -149,9 +153,33 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
       updated &&
       (updated.updatedAt !== selectedSession?.updatedAt ||
         updated.summary !== selectedSession?.summary ||
+        updated.pinned !== selectedSession?.pinned ||
         updated.tags !== selectedSession?.tags)
     ) setSelectedSession(updated)
   }, [sessions])
+
+  // Reconcile optimistic pin overrides once the freshly-loaded sessions agree with them.
+  useEffect(() => {
+    setPinOverrides((prev) => {
+      const ids = Object.keys(prev)
+      if (ids.length === 0) return prev
+      let changed = false
+      const next = { ...prev }
+      for (const s of sessions) {
+        if (s.id in next && s.pinned === next[s.id]) {
+          delete next[s.id]
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [sessions])
+
+  // Apply optimistic pin overrides so ordering/icons reflect the latest toggle immediately.
+  const effectiveSessions = useMemo(() => {
+    if (Object.keys(pinOverrides).length === 0) return sessions
+    return sessions.map((s) => (s.id in pinOverrides ? { ...s, pinned: pinOverrides[s.id] } : s))
+  }, [sessions, pinOverrides])
 
   const startRename = () => {
     setRenameValue(selectedSession?.summary || '')
@@ -168,6 +196,14 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
   const cancelRename = () => {
     setIsRenaming(false)
     setRenameValue('')
+  }
+
+  const togglePin = async (session: SessionSummary, e?: ReactMouseEvent) => {
+    e?.stopPropagation()
+    const next = !(session.id in pinOverrides ? pinOverrides[session.id] : session.pinned)
+    setPinOverrides((prev) => ({ ...prev, [session.id]: next }))
+    await window.gridwatchAPI.setPinned(session.id, next)
+    onSessionRenamed()
   }
 
   const addTag = async (tag: string) => {
@@ -264,7 +300,10 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
 
   const clearTagFilter = () => setSelectedTags(new Set())
 
-  const filtered = useMemo(() => sessions.filter((s) => {
+  const filtered = useMemo(() => {
+    const matched = effectiveSessions.filter((s) => {
+    // Pinned sessions always stay visible, regardless of any active filter.
+    if (s.pinned) return true
     // Type filter
     if (typeFilter === 'research' && !s.isResearch) return false
     if (typeFilter === 'review' && !s.isReview) return false
@@ -279,13 +318,17 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
     if (!debouncedSearch) return true
     const q = debouncedSearch.toLowerCase()
     return (
+      s.id.toLowerCase().includes(q) ||
       (s.summary || '').toLowerCase().includes(q) ||
       (s.repository || '').toLowerCase().includes(q) ||
       (s.cwd || '').toLowerCase().includes(q) ||
       (s.branch || '').toLowerCase().includes(q) ||
       [...(s.tags ?? []), ...(s.autoTags ?? [])].some((t) => t.toLowerCase().includes(q))
     )
-  }), [sessions, selectedTags, debouncedSearch, typeFilter])
+    })
+    // Pinned sessions float to the top; original updatedAt order is otherwise preserved.
+    return matched.sort((a, b) => Number(b.pinned) - Number(a.pinned))
+  }, [effectiveSessions, selectedTags, debouncedSearch, typeFilter])
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paginated = useMemo(() => filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), [filtered, page])
@@ -296,6 +339,11 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
   const totalCount = sessions.length
   const todayCount = useMemo(() => sessions.filter((s) => isToday(s.createdAt)).length, [sessions])
   const uniqueRepos = useMemo(() => new Set(sessions.map((s) => s.repository || s.cwd)).size, [sessions])
+
+  // Effective pinned state for the selected session, honouring any optimistic override.
+  const selectedPinned = selectedSession
+    ? (selectedSession.id in pinOverrides ? pinOverrides[selectedSession.id] : selectedSession.pinned)
+    : false
 
   const statusBadgeClass = (status: 'active' | 'today' | 'older') => {
     if (status === 'active') return styles.badgeActive
@@ -327,7 +375,7 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
           <input
             className={styles.searchInput}
             type="text"
-            placeholder="SEARCH SESSIONS…"
+            placeholder="SEARCH SESSIONS / ID…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -396,13 +444,20 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
             return (
               <div
                 key={session.id}
-                className={`${styles.card} ${isActive ? styles.cardActive : ''}`}
+                className={`${styles.card} ${isActive ? styles.cardActive : ''} ${session.pinned ? styles.cardPinned : ''}`}
                 onClick={() => setSelectedSession(isActive ? null : session)}
               >
                 <div className={styles.cardRow1}>
                   <div className={styles.cardSummary}>
                     {session.summary || session.lastUserMessage || 'UNTITLED SESSION'}
                   </div>
+                  <button
+                    className={`${styles.pinBtn} ${session.pinned ? styles.pinBtnActive : ''}`}
+                    onClick={(e) => togglePin(session, e)}
+                    title={session.pinned ? 'Unpin session' : 'Pin session to top'}
+                    aria-label={session.pinned ? 'Unpin session' : 'Pin session to top'}
+                    aria-pressed={session.pinned}
+                  >{session.pinned ? '★' : '☆'}</button>
                   <span className={`${styles.badge} ${statusBadgeClass(status)}`}>
                     {statusLabel(status)}
                   </span>
@@ -482,8 +537,15 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
               </div>
             ) : (
               <>
-                <div className={styles.detailSummary}>
-                  {selectedSession.summary || 'SESSION DETAIL'}
+                <div
+                  className={styles.detailSummary}
+                  onDoubleClick={startRename}
+                  title="Double-click to rename"
+                >
+                  <span className={styles.detailSummaryText}>
+                    {selectedSession.summary || 'SESSION DETAIL'}
+                  </span>
+                  <span className={styles.editHint} aria-hidden="true">✎</span>
                   {selectedSession.isResearch && (
                     <span className={styles.researchBadgeDetail}>RESEARCH</span>
                   )}
@@ -493,12 +555,18 @@ function SessionsPage({ sessions, onSessionRenamed }: Props) {
                 </div>
                 <div className={styles.detailActions}>
                   <button
+                    className={`${styles.pinBtn} ${selectedPinned ? styles.pinBtnActive : ''}`}
+                    onClick={() => void togglePin(selectedSession)}
+                    title={selectedPinned ? 'Unpin session' : 'Pin session to top'}
+                    aria-label={selectedPinned ? 'Unpin session' : 'Pin session to top'}
+                    aria-pressed={selectedPinned}
+                  >{selectedPinned ? '★' : '☆'}</button>
+                  <button
                     className={styles.openFolderBtn}
                     onClick={() => void window.gridwatchAPI.openItemFolder('session', selectedSession.id).catch(() => {})}
                     title="Open session folder"
                     aria-label="Open session folder"
                   >⊞</button>
-                  <button className={styles.renameBtn} onClick={startRename} title="Rename session">✎</button>
                   <button className={styles.archiveBtn} onClick={() => { setConfirm('archive'); setActionError(null) }} title="Archive session">⊟</button>
                   <button className={styles.deleteBtn} onClick={() => { setConfirm('delete'); setActionError(null) }} title="Delete session">⊗</button>
                   <button className={styles.closeBtn} onClick={() => setSelectedSession(null)}>×</button>

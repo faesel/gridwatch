@@ -31,6 +31,7 @@ declare global {
       deleteSession: (sessionId: string) => Promise<{ ok: boolean; error?: string }>;
       setTags: (sessionId: string, tags: string[]) => Promise<boolean>;
       setNotes: (sessionId: string, notes: string) => Promise<boolean>;
+      setPinned: (sessionId: string, pinned: boolean) => Promise<boolean>;
       getContext: (sessionId: string) => Promise<{
         plan: string | null;
         checkpoints: string[];

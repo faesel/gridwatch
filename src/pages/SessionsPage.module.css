@@ -183,6 +183,10 @@
   background: var(--tron-panel-hover);
 }
 
+.cardPinned {
+  border-left-color: var(--tron-orange);
+}
+
 .cardRow1 {
   display: flex;
   align-items: center;
@@ -273,6 +277,29 @@
   text-shadow: var(--tron-glow-cyan);
   flex: 1;
   margin-right: 12px;
+  cursor: text;
+}
+
+.detailSummaryText {
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.15s;
+}
+
+.detailSummary:hover .detailSummaryText {
+  border-bottom-color: color-mix(in srgb, var(--tron-cyan) 40%, transparent);
+}
+
+.editHint {
+  margin-left: 8px;
+  font-size: calc(11 * var(--font-scale, 1) * 1px);
+  color: var(--tron-text-dim);
+  opacity: 0;
+  text-shadow: none;
+  transition: opacity 0.15s;
+}
+
+.detailSummary:hover .editHint {
+  opacity: 1;
 }
 
 .detailActions {
@@ -313,21 +340,28 @@
   color: var(--tron-yellow);
 }
 
-.renameBtn {
+.pinBtn {
   background: none;
   border: 1px solid var(--tron-border);
   color: var(--tron-text-dim);
   cursor: pointer;
   font-size: calc(14 * var(--font-scale, 1) * 1px);
-  padding: 2px 8px;
+  line-height: 1;
+  padding: 2px 6px;
   font-family: inherit;
+  flex-shrink: 0;
   transition: all 0.15s;
 }
 
-.renameBtn:hover {
+.pinBtn:hover {
   border-color: var(--tron-orange);
   color: var(--tron-orange);
-  box-shadow: var(--tron-glow-orange);
+}
+
+.pinBtnActive {
+  border-color: var(--tron-orange);
+  color: var(--tron-orange);
+  text-shadow: var(--tron-glow-orange);
 }
 
 .archiveBtn {

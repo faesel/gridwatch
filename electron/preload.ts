@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('gridwatchAPI', {
     ipcRenderer.invoke('sessions:set-tags', sessionId, tags),
   setNotes: (sessionId: string, notes: string) =>
     ipcRenderer.invoke('sessions:set-notes', sessionId, notes),
+  setPinned: (sessionId: string, pinned: boolean) =>
+    ipcRenderer.invoke('sessions:set-pinned', sessionId, pinned),
   getContext: (sessionId: string) =>
     ipcRenderer.invoke('sessions:get-context', sessionId),
   writeTransfer: (sessionId: string, content: string) =>
