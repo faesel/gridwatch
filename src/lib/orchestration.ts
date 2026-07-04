@@ -198,8 +198,9 @@ export function mergeManagedBlock(
   const before = text.slice(0, startIdx);
   const after = text.slice(endIdx);
   // Trim a banner (consecutive comment lines) immediately before/after the markers.
-  const beforeTrimmed = before.replace(/(?:<!--[^\n]*-->\n)+$/, '');
-  const afterTrimmed = after.replace(/^\n?(?:<!--[^\n]*-->\n?)+/, '');
+  // Comment bodies use [\s\S]*? (not [^\n]*) so multi-line HTML comments are matched safely.
+  const beforeTrimmed = before.replace(/(?:<!--[\s\S]*?-->\n)+$/, '');
+  const afterTrimmed = after.replace(/^\n?(?:<!--[\s\S]*?-->\n?)+/, '');
   const head = beforeTrimmed.replace(/\n+$/, '');
   const tail = afterTrimmed.replace(/^\n+/, '');
   const newText = `${head}\n\n${managedBlock}\n${tail ? `\n${tail}` : '\n'}`;
