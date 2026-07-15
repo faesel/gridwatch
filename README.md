@@ -27,6 +27,7 @@ GridWatch reads the local session data written by [GitHub Copilot CLI](https://g
   - [Settings](#%EF%B8%8F-settings)
   - [Tech stack](#%EF%B8%8F-tech-stack)
   - [Design system](#-design-system)
+- [Changelog](#-changelog)
 - [Releasing](#-releasing)
 - [Contributing](#-contributing)
 - [License](#-license)
@@ -329,6 +330,17 @@ The Tron-inspired colour palette is defined as CSS custom properties in `src/ind
   --tron-blue: #0080ff /* secondary accent */ --tron-orange: #ff6600
   /* destructive / highlight */ --tron-border: #1a2a4a /* border colour */;
 ```
+
+---
+
+## 📝 Changelog
+
+### v0.39.3
+
+- **Fixed: token metrics restored in the Sessions view.** Copilot CLI ~1.0.70 stopped writing the `Utilization X% (used/total tokens)` lines to its process logs, which caused token panels to disappear. GridWatch now reads token data directly from each session's `events.jsonl`.
+- **Initial + peak tokens now show up straight away.** Token figures no longer depend on a compaction happening — the startup baseline (`systemTokens + toolDefinitionsTokens`) is used for **initial tokens**, and the session's final `session.shutdown` context occupancy is used for **peak tokens** on sessions that never compacted. Compacted sessions still report the highest pre-compaction peak.
+- **Smarter context-window inference** from the session model, with the shutdown value correctly excluded from the threshold-based fallback.
+- **Note:** live/active sessions (not yet compacted or shut down) and very old pre-Feb-2026 sessions have no context-occupancy snapshot in `events.jsonl`, so they show no token panel — an inherent Copilot CLI limitation.
 
 ---
 

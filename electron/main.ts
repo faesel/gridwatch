@@ -291,6 +291,53 @@ interface SessionTokenData {
   contextWindow: number
 }
 
+// ── events.jsonl token parsing (source of truth since Copilot CLI ~1.0.70) ────
+//
+// Copilot stopped emitting `CompactionProcessor: Utilization X% (used/total tokens)`
+// log lines. Token context now lives in each session's events.jsonl, primarily as
+// `session.compaction_complete.data.preCompactionTokens` — the context occupancy just
+// before each compaction. This is present uniformly (verified back to Feb 2026) and is
+// never pruned, unlike the process logs. The context-window denominator is no longer
+// logged numerically, so it is inferred from the model (with a data-driven fallback).
+
+// Copilot triggers a background compaction at roughly 80% context utilisation. Used as the
+// fallback divisor to infer an unknown model's context window from the observed peak.
+const COMPACTION_THRESHOLD = 0.8
+
+// Context-window sizes observed across Copilot models (used to snap an inferred value).
+const KNOWN_CONTEXT_WINDOWS = [128000, 168000, 200000, 272000, 922000, 1000000]
+
+// Map a model id to its context window. Claude 4.x = 200K (verified: 162,697 ≈ 81% of 200K),
+// GPT-5.x = 272K, GPT-4.x = 128K, Gemini = ~1M. Unknown models return undefined so callers
+// can fall back to data-driven inference.
+function contextWindowForModel(model?: string): number | undefined {
+  if (!model) return undefined
+  const m = model.toLowerCase()
+  if (m.startsWith('claude-')) return 200000
+  if (m.startsWith('gpt-5')) return 272000
+  if (m.startsWith('gpt-4')) return 128000
+  if (m.startsWith('gemini')) return 1000000
+  return undefined
+}
+
+// Snap an inferred window size to the nearest observed context-window size.
+function snapContextWindow(n: number): number {
+  return KNOWN_CONTEXT_WINDOWS.reduce(
+    (best, w) => (Math.abs(w - n) < Math.abs(best - n) ? w : best),
+    KNOWN_CONTEXT_WINDOWS[0],
+  )
+}
+
+// Extract a concise one-paragraph summary from a compaction's summaryContent block
+// (prefers the <overview>…</overview> section) for display when no log-derived summary exists.
+function extractOverview(summaryContent?: string): string | undefined {
+  if (!summaryContent) return undefined
+  const m = summaryContent.match(/<overview>\s*([\s\S]*?)\s*<\/overview>/i)
+  const text = (m ? m[1] : summaryContent).replace(/\s+/g, ' ').trim()
+  if (!text) return undefined
+  return text.length > 240 ? `${text.slice(0, 237)}…` : text
+}
+
 interface TokenIndex {
   index: Map<string, SessionTokenData>
   oldestLogTs: number | null
@@ -508,6 +555,19 @@ async function loadAllSessions(): Promise<SessionData[]> {
         const userMessages: { content: string; model?: string; timestamp?: string }[] = []
         let hasCodeReviewAgent = false
         const agentTypesUsed = new Set<string>()
+        // Token snapshots parsed from session.compaction_complete events (see events.jsonl notes).
+        const compactionSnapshots: { ts: string; pre: number; summary?: string; messages?: number }[] = []
+        let compactionModel: string | undefined
+        let eventModelFallback: string | undefined
+        // Final context occupancy from session.shutdown — the token snapshot for sessions that
+        // never compacted (context grows monotonically until compaction, so this is their peak).
+        let shutdownTokens: number | undefined
+        let shutdownTokensTs: string | undefined
+        let shutdownModel: string | undefined
+        // Startup context baseline = systemTokens + toolDefinitionsTokens (the fixed overhead
+        // present before the conversation grows). Captured from the earliest source available
+        // (first compaction_start, else shutdown). This is the panel's "initial tokens".
+        let baselineTokens: number | undefined
 
         const eventsFile = path.join(sessionDir, 'events.jsonl')
         const eventsContent = await readTextMaybe(eventsFile)
@@ -517,7 +577,7 @@ async function loadAllSessions(): Promise<SessionData[]> {
             if (line.includes('"agent_type":"code-review"')) hasCodeReviewAgent = true
             const agentMatch = line.match(/"agent_type"\s*:\s*"([^"]+)"/)
             if (agentMatch) agentTypesUsed.add(agentMatch[1])
-            if (!line.includes('session.start') && !line.includes('user.message') && !line.includes('tool.execution_start') && !line.includes('tool.execution_complete')) continue
+            if (!line.includes('session.start') && !line.includes('user.message') && !line.includes('tool.execution_start') && !line.includes('tool.execution_complete') && !line.includes('session.compaction_start') && !line.includes('session.compaction_complete') && !line.includes('session.shutdown')) continue
             try {
               allEvents.push(JSON.parse(line))
             } catch {
@@ -527,6 +587,7 @@ async function loadAllSessions(): Promise<SessionData[]> {
 
           // Collect model info from tool.execution_complete events
           const toolModels: { timestamp: string; model: string }[] = []
+          let pendingCompactionTs: string | null = null
           for (const event of allEvents) {
             if (event.type === 'session.start' && event.data?.copilotVersion) {
               copilotVersion = event.data.copilotVersion as string
@@ -549,6 +610,47 @@ async function loadAllSessions(): Promise<SessionData[]> {
             if (event.type === 'tool.execution_complete' && event.data?.model) {
               toolModels.push({ timestamp: event.timestamp || '', model: event.data.model as string })
             }
+            if (event.type === 'session.compaction_start') {
+              pendingCompactionTs = event.timestamp || null
+              const dm = event.data?.model
+              if (typeof dm === 'string' && dm) compactionModel = dm
+              if (baselineTokens === undefined) {
+                const sys = event.data?.systemTokens
+                const tools = event.data?.toolDefinitionsTokens
+                if (typeof sys === 'number' && typeof tools === 'number') baselineTokens = sys + tools
+              }
+            }
+            if (event.type === 'session.compaction_complete') {
+              const d = event.data ?? {}
+              if (typeof d.model === 'string' && d.model) compactionModel = d.model
+              const pre = typeof d.preCompactionTokens === 'number' ? d.preCompactionTokens : 0
+              if (pre > 0) {
+                compactionSnapshots.push({
+                  ts: pendingCompactionTs || event.timestamp || '',
+                  pre,
+                  summary: extractOverview(typeof d.summaryContent === 'string' ? d.summaryContent : undefined),
+                  messages: typeof d.preCompactionMessagesLength === 'number' ? d.preCompactionMessagesLength : undefined,
+                })
+              }
+              pendingCompactionTs = null
+            }
+            if (event.type === 'session.shutdown') {
+              const d = event.data ?? {}
+              if (typeof d.currentTokens === 'number' && d.currentTokens > 0) {
+                shutdownTokens = d.currentTokens
+                shutdownTokensTs = event.timestamp
+              }
+              if (baselineTokens === undefined) {
+                const sys = d.systemTokens
+                const tools = d.toolDefinitionsTokens
+                if (typeof sys === 'number' && typeof tools === 'number') baselineTokens = sys + tools
+              }
+              const mm = d.modelMetrics
+              if (mm && typeof mm === 'object') {
+                const k = Object.keys(mm as Record<string, unknown>)[0]
+                if (k) shutdownModel = k
+              }
+            }
           }
 
           // Assign model to each user message from the first tool_complete after it
@@ -556,6 +658,7 @@ async function loadAllSessions(): Promise<SessionData[]> {
             const found = toolModels.find(tc => tc.timestamp > (um.timestamp || ''))
             if (found) um.model = found.model
           }
+          eventModelFallback = toolModels[toolModels.length - 1]?.model
         }
 
         // Rewind snapshots + files modified — read and parse the index once.
@@ -594,8 +697,14 @@ async function loadAllSessions(): Promise<SessionData[]> {
           updatedAt = evtsMtime.toISOString()
         }
 
-        // Token usage: tier 1 = live log (source of truth); tier 2 = persisted snapshot
-        // from gridwatch.json (survives Copilot's ~14-day log pruning); tier 3 = none.
+        // Token usage resolution tiers:
+        //   1. Legacy process-log Utilization history (richest — full per-request samples),
+        //      only present for sessions still within the pre-1.0.70 log window.
+        //   2. events.jsonl snapshots (uniform, un-pruned — the current source of truth since
+        //      Copilot stopped emitting Utilization log lines): startup baseline (initial),
+        //      compaction preCompaction peaks, and session.shutdown final occupancy.
+        //   3. Persisted gridwatch.json snapshot (survives log pruning for legacy sessions).
+        //   4. None.
         const sessionId: string = workspace.id || entry
         const metaRaw = await readTextMaybe(path.join(sessionDir, 'gridwatch.json'))
         let sessionMeta: Record<string, unknown> = {}
@@ -610,7 +719,42 @@ async function loadAllSessions(): Promise<SessionData[]> {
           }
         }
         const tokenData = tokenIndex.index.get(sessionId)
-        const storedStats = tokenData ? null : parseStoredTokenStats(sessionMeta)
+        const storedStats = parseStoredTokenStats(sessionMeta)
+
+        // Derive token stats from events.jsonl snapshots (tier 2).
+        compactionSnapshots.sort((a, b) => a.ts.localeCompare(b.ts))
+        const compactionPeak = compactionSnapshots.reduce((m, c) => Math.max(m, c.pre), 0)
+        // Peak context occupancy = the highest snapshot we have. Context grows until compaction
+        // (a local peak) then resets; a session that never compacts peaks at shutdown.
+        const eventPeakTokens = Math.max(compactionPeak, shutdownTokens ?? 0)
+        // Infer the context window from the model. The /0.8 fallback may only use a compaction
+        // peak (which sits at the ~80% threshold); a shutdown occupancy can be at any level.
+        const eventWindow = contextWindowForModel(compactionModel || shutdownModel || eventModelFallback)
+          ?? (compactionPeak > 0 ? snapContextWindow(Math.round(compactionPeak / COMPACTION_THRESHOLD)) : undefined)
+        const eventUtil = (tok: number): number => (eventWindow ? (tok / eventWindow) * 100 : 0)
+        // Assemble a coarse timeline from the snapshots we have: startup baseline → each
+        // compaction peak → final shutdown occupancy.
+        const eventTokenHistory: TokenDataPoint[] = []
+        if (baselineTokens !== undefined) {
+          eventTokenHistory.push({ timestamp: createdAt, tokens: baselineTokens, utilisation: eventUtil(baselineTokens) })
+        }
+        for (const c of compactionSnapshots) {
+          eventTokenHistory.push({ timestamp: c.ts, tokens: c.pre, utilisation: eventUtil(c.pre) })
+        }
+        if (shutdownTokens !== undefined) {
+          eventTokenHistory.push({ timestamp: shutdownTokensTs || updatedAt, tokens: shutdownTokens, utilisation: eventUtil(shutdownTokens) })
+        }
+        eventTokenHistory.sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+        const eventCompactions: CompactionEvent[] = compactionSnapshots.map((c) => ({
+          timestamp: c.ts,
+          triggerUtilisation: eventUtil(c.pre),
+          forced: false,
+          messagesReplaced: c.messages,
+          summary: c.summary,
+        }))
+        // Initial = startup baseline (system + tool-definition tokens); fall back to the first
+        // point in the assembled history if the baseline snapshot is unavailable.
+        const eventInitialTokens = baselineTokens ?? eventTokenHistory[0]?.tokens
 
         let tokenHistory: TokenDataPoint[]
         let peakTokens: number
@@ -621,8 +765,8 @@ async function loadAllSessions(): Promise<SessionData[]> {
         let initialUtilisation: number | undefined
         let tokenStatsCached = false
 
-        if (tokenData) {
-          // Tier 1: live log
+        if (tokenData && tokenData.tokenHistory.length > 0) {
+          // Tier 1: legacy process-log Utilization history (full per-request samples).
           tokenHistory = tokenData.tokenHistory
           peakTokens = tokenData.peakTokens
           peakUtilisation = tokenData.peakUtilisation
@@ -630,8 +774,19 @@ async function loadAllSessions(): Promise<SessionData[]> {
           contextWindow = tokenData.contextWindow || undefined
           initialTokens = tokenData.tokenHistory[0]?.tokens
           initialUtilisation = tokenData.tokenHistory[0]?.utilisation
+        } else if (eventPeakTokens > 0) {
+          // Tier 2: events.jsonl snapshots (baseline + compactions + shutdown).
+          tokenHistory = eventTokenHistory
+          peakTokens = eventPeakTokens
+          peakUtilisation = eventUtil(eventPeakTokens)
+          contextWindow = eventWindow
+          initialTokens = eventInitialTokens
+          initialUtilisation = eventInitialTokens !== undefined ? eventUtil(eventInitialTokens) : undefined
+          // Prefer log-derived compactions (they carry tokensSaved/forced/newMessages); fall
+          // back to event-derived compactions once the process log has been pruned.
+          compactions = tokenData && tokenData.compactions.length > 0 ? tokenData.compactions : eventCompactions
         } else if (storedStats) {
-          // Tier 2: persisted snapshot (summary only — no per-sample history)
+          // Tier 3: persisted snapshot (summary only — no per-sample history)
           tokenHistory = []
           peakTokens = storedStats.peakTokens
           peakUtilisation = storedStats.peakUtilisation
@@ -647,9 +802,11 @@ async function loadAllSessions(): Promise<SessionData[]> {
           compactions = []
         }
 
-        // High-confidence "pruned" detection: logs exist, this session has neither a live
-        // log nor a saved snapshot, and it predates the oldest surviving log (~2-week rotation).
-        const tokenLogPruned = !tokenData
+        // High-confidence "pruned" detection: logs exist, this session has no live log data,
+        // no events.jsonl token snapshot, and no saved snapshot, and it predates the oldest
+        // surviving log (~2-week rotation).
+        const tokenLogPruned = (!tokenData || tokenData.tokenHistory.length === 0)
+          && eventPeakTokens === 0
           && !storedStats
           && tokenIndex.logsAvailable
           && tokenIndex.oldestLogTs !== null
@@ -759,19 +916,19 @@ async function loadAllSessions(): Promise<SessionData[]> {
     sessions.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
 
     // Persist token snapshots for the first page (most-recently-updated) sessions that have
-    // live log data, so the numbers survive Copilot's log pruning. Writes are skipped when
-    // unchanged, serialised per session, and atomic — see persistTokenStats.
+    // resolved token data, so the numbers survive Copilot's log pruning. Snapshots that were
+    // themselves loaded from a saved snapshot are skipped (no new information). Writes are
+    // skipped when unchanged, serialised per session, and atomic — see persistTokenStats.
     for (let i = 0; i < Math.min(TOKEN_SNAPSHOT_LIMIT, sessions.length); i++) {
       const s = sessions[i]
-      const live = tokenIndex.index.get(s.id)
-      if (!live || live.tokenHistory.length === 0) continue
+      if (s.peakTokens <= 0 || s.tokenStatsCached) continue
       persistTokenStats(s.id, {
-        peakTokens: live.peakTokens,
-        peakUtilisation: live.peakUtilisation,
-        contextWindow: live.contextWindow || undefined,
-        initialTokens: live.tokenHistory[0]?.tokens,
-        initialUtilisation: live.tokenHistory[0]?.utilisation,
-        compactions: live.compactions.length,
+        peakTokens: s.peakTokens,
+        peakUtilisation: s.peakUtilisation,
+        contextWindow: s.contextWindow,
+        initialTokens: s.initialTokens,
+        initialUtilisation: s.initialUtilisation,
+        compactions: s.compactions.length,
       })
     }
 
@@ -853,41 +1010,32 @@ ipcMain.handle(
       return logTokensCache.data
     }
     try {
-      const logDir = path.join(os.homedir(), '.copilot', 'logs')
-      if (!fs.existsSync(logDir)) return []
+      // Aggregate the peak tokens/utilisation per calendar day across all sessions. Token
+      // history is sourced from events.jsonl compaction snapshots (or legacy log samples) via
+      // loadAllSessions, so this survives Copilot's process-log pruning and stays consistent
+      // with the per-session numbers shown elsewhere.
+      const sessions = await loadAllSessions()
+      const map = new Map<string, { tokens: number; utilisation: number }>()
 
-      const files = fs
-        .readdirSync(logDir)
-        .filter((f) => f.startsWith('process-') && f.endsWith('.log'))
+      const consider = (date: string, tokens: number, utilisation: number): void => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || tokens <= 0) return
+        const existing = map.get(date)
+        if (!existing || tokens > existing.tokens) map.set(date, { tokens, utilisation })
+      }
 
-      const results: { date: string; tokens: number; utilisation: number }[] = []
-
-      for (const f of files) {
-        const m = f.match(/process-(\d+)-\d+\.log/)
-        if (!m) continue
-        const ts = parseInt(m[1], 10)
-        const date = new Date(ts).toISOString().slice(0, 10)
-
-        try {
-          const content = fs.readFileSync(path.join(logDir, f), 'utf-8')
-          let peakTokens = 0
-          let peakUtilisation = 0
-          for (const line of content.split('\n')) {
-            if (!line.includes('CompactionProcessor') && !line.includes('Utiliz')) continue
-            const parsed = parseTokenLine(line)
-            if (!parsed) continue
-            if (parsed.tokens > peakTokens) peakTokens = parsed.tokens
-            if (parsed.utilisation > peakUtilisation) peakUtilisation = parsed.utilisation
-          }
-          if (peakTokens > 0) {
-            results.push({ date, tokens: peakTokens, utilisation: peakUtilisation })
-          }
-        } catch {
-          // skip
+      for (const s of sessions) {
+        const history = s.tokenHistory ?? []
+        if (history.length > 0) {
+          for (const p of history) consider((p.timestamp || '').slice(0, 10), p.tokens, p.utilisation)
+        } else if (s.peakTokens > 0) {
+          // Snapshot-only sessions (no per-sample history): attribute the peak to the last active day.
+          consider((s.updatedAt || '').slice(0, 10), s.peakTokens, s.peakUtilisation)
         }
       }
 
-      results.sort((a, b) => a.date.localeCompare(b.date))
+      const results = Array.from(map.entries())
+        .map(([date, { tokens, utilisation }]) => ({ date, tokens, utilisation }))
+        .sort((a, b) => a.date.localeCompare(b.date))
       logTokensCache = { data: results, timestamp: Date.now() }
       return results
     } catch {
